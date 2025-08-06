@@ -1,0 +1,235 @@
+"use client";
+
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import LoadingSpinner from "../LoadingSpinner";
+
+const leaveRequestSchema = z.object({
+  leaveType: z.string({
+    required_error: "الرجاء اختيار نوع الإجازة.",
+  }),
+  startDate: z.date({
+    required_error: "الرجاء اختيار تاريخ البدء.",
+  }),
+  endDate: z.date({
+    required_error: "الرجاء اختيار تاريخ الانتهاء.",
+  }),
+  notes: z.string().max(250, "الملاحظات يجب ألا تتجاوز 250 حرفًا.").optional(),
+}).refine(data => data.endDate >= data.startDate, {
+  message: "تاريخ الانتهاء يجب أن يكون بعد أو بنفس تاريخ البدء.",
+  path: ["endDate"],
+});
+
+type LeaveRequestFormValues = z.infer<typeof leaveRequestSchema>;
+
+interface LeaveRequestFormProps {
+  employeeId: string;
+}
+
+export default function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const form = useForm<LeaveRequestFormValues>({
+    resolver: zodResolver(leaveRequestSchema),
+  });
+
+  const onSubmit = async (data: LeaveRequestFormValues) => {
+    setLoading(true);
+    try {
+      const requestId = `leave_${employeeId}_${Date.now()}`;
+      await setDoc(doc(db, "leaveRequests", requestId), {
+        ...data,
+        employeeId,
+        startDate: format(data.startDate, "yyyy-MM-dd"),
+        endDate: format(data.endDate, "yyyy-MM-dd"),
+        status: "pending", // pending, approved, rejected
+        createdAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "تم إرسال الطلب",
+        description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
+      });
+      form.reset();
+    } catch (error) {
+      console.error("Error submitting leave request: ", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>تقديم طلب إجازة</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="leaveType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>نوع الإجازة</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر نوع الإجازة" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="annual">سنوية</SelectItem>
+                      <SelectItem value="sick">مرضية</SelectItem>
+                      <SelectItem value="emergency">طارئة</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>تاريخ البدء</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>اختر تاريخًا</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>تاريخ الانتهاء</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>اختر تاريخًا</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ملاحظات إضافية (اختياري)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="أدخل ملاحظاتك هنا..."
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <LoadingSpinner />}
+              {loading ? "جارٍ الإرسال..." : "إرسال الطلب"}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

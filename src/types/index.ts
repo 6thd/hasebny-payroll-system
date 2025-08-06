@@ -1,4 +1,6 @@
 import type { User as FirebaseUser } from 'firebase/auth';
+import type { Timestamp } from 'firebase/firestore';
+
 
 export interface DayData {
   status: 'present' | 'sick_leave' | 'annual_leave' | 'absent';
@@ -77,4 +79,21 @@ export interface Payslip {
   // You can add detailed breakdowns if needed
   // additions: { overtime: number; bonus: number; };
   // deductions: { tax: number; socialSecurity: number; };
+}
+
+/**
+ * Represents a leave request from an employee.
+ * Stored in the 'leaveRequests' collection.
+ */
+export interface LeaveRequest {
+  id: string; // Document ID
+  employeeId: string;
+  leaveType: 'annual' | 'sick' | 'emergency';
+  startDate: string; // ISO 8601 format (YYYY-MM-DD)
+  endDate: string; // ISO 8601 format (YYYY-MM-DD)
+  notes?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Timestamp;
+  reviewedBy?: string; // Admin/Manager UID
+  reviewedAt?: Timestamp;
 }
