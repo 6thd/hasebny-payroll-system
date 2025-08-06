@@ -6,6 +6,7 @@ import { getFridaysInMonth, calculatePayroll, MONTHS } from '@/lib/utils';
 import type { Worker, DayData } from '@/types';
 import { cn } from '@/lib/utils';
 import DayDetailsModal from './modals/DayDetailsModal';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface AttendanceTableProps {
   workers: Worker[];
@@ -62,7 +63,7 @@ export default function AttendanceTable({ workers, year, month, isAdmin, onDataU
 
   return (
     <>
-      <div className="overflow-x-auto relative">
+      <ScrollArea className="w-full whitespace-nowrap">
         <Table className="min-w-full text-sm">
           <TableHeader>
             <TableRow className="bg-gray-200 text-gray-600 uppercase hover:bg-gray-200">
@@ -109,7 +110,7 @@ export default function AttendanceTable({ workers, year, month, isAdmin, onDataU
             })}
           </TableBody>
         </Table>
-      </div>
+      </ScrollArea>
 
       {modalState.isOpen && modalState.worker && modalState.day !== null && (
         <DayDetailsModal
