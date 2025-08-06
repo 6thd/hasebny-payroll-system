@@ -13,9 +13,10 @@ interface DashboardHeaderProps {
   user: AppUser;
   date: { year: number; month: number };
   onDateChange: (newDate: { year: number; month: number }) => void;
+  isAdmin: boolean;
 }
 
-export default function DashboardHeader({ user, date, onDateChange }: DashboardHeaderProps) {
+export default function DashboardHeader({ user, date, onDateChange, isAdmin }: DashboardHeaderProps) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -29,35 +30,39 @@ export default function DashboardHeader({ user, date, onDateChange }: DashboardH
     <header className="mb-8 no-print">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="text-center sm:text-right">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-700">نظام الحضور والرواتب</h1>
-          <div className="flex items-center gap-2 justify-center sm:justify-start mt-2">
-            <Select
-              value={String(date.month)}
-              onValueChange={(value) => onDateChange({ ...date, month: Number(value) })}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="الشهر" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={String(date.year)}
-              onValueChange={(value) => onDateChange({ ...date, year: Number(value) })}
-            >
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="السنة" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map(y => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-700">
+            {isAdmin ? 'نظام الحضور والرواتب' : 'بوابة الموظف'}
+          </h1>
+          {isAdmin && (
+            <div className="flex items-center gap-2 justify-center sm:justify-start mt-2">
+              <Select
+                value={String(date.month)}
+                onValueChange={(value) => onDateChange({ ...date, month: Number(value) })}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="الشهر" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(date.year)}
+                onValueChange={(value) => onDateChange({ ...date, year: Number(value) })}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="السنة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 justify-center items-center">
           <div className="text-sm font-semibold text-gray-600 bg-gray-200 px-3 py-1 rounded-full">

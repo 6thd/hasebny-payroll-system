@@ -16,6 +16,7 @@ import { Printer, FileDown, Users, CircleDollarSign } from 'lucide-react';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import { exportToExcel } from '@/lib/xlsx';
+import EmployeeDashboard from './EmployeeDashboard';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -37,6 +38,8 @@ export default function Dashboard() {
         const employeesSnapshot = await getDocs(collection(db, 'employees'));
         workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       } else {
+        // For an employee, we fetch only their data.
+        // The user object from useAuth should already contain this.
         workersToLoad = [user as Worker];
       }
 
@@ -92,45 +95,49 @@ export default function Dashboard() {
           user={user}
           date={date}
           onDateChange={handleDateChange}
+          isAdmin={isAdmin}
         />
 
-        {isAdmin && (
+        {isAdmin ? (
           <>
             <KPIs workers={workers} year={date.year} month={date.month} />
             <Charts workers={workers} year={date.year} month={date.month} />
+            <div className="flex flex-wrap gap-2 justify-center my-6 no-print">
+              <Button onClick={() => setPayrollModalOpen(true)}>
+                <CircleDollarSign className="mr-2 h-4 w-4" />
+                مسير الرواتب
+              </Button>
+              <Button onClick={() => setEmployeeModalOpen(true)}>
+                <Users className="mr-2 h-4 w-4" />
+                إدارة الموظفين
+              </Button>
+              <Button onClick={handlePrint} variant="outline">
+                <Printer className="mr-2 h-4 w-4" />
+                طباعة التقرير
+              </Button>
+              <Button onClick={() => exportToExcel(workers, date.year, date.month)} variant="outline">
+                <FileDown className="mr-2 h-4 w-4" />
+                تصدير Excel
+              </Button>
+            </div>
+            <div className="card overflow-hidden shadow-lg">
+              <AttendanceTable
+                workers={workers}
+                year={date.year}
+                month={date.month}
+                isAdmin={isAdmin}
+                onDataUpdate={handleDataUpdate}
+              />
+            </div>
           </>
-        )}
-
-        {isAdmin && (
-          <div className="flex flex-wrap gap-2 justify-center my-6 no-print">
-            <Button onClick={() => setPayrollModalOpen(true)}>
-              <CircleDollarSign className="mr-2 h-4 w-4" />
-              مسير الرواتب
-            </Button>
-            <Button onClick={() => setEmployeeModalOpen(true)}>
-              <Users className="mr-2 h-4 w-4" />
-              إدارة الموظفين
-            </Button>
-            <Button onClick={handlePrint} variant="outline">
-              <Printer className="mr-2 h-4 w-4" />
-              طباعة التقرير
-            </Button>
-            <Button onClick={() => exportToExcel(workers, date.year, date.month)} variant="outline">
-              <FileDown className="mr-2 h-4 w-4" />
-              تصدير Excel
-            </Button>
-          </div>
-        )}
-
-        <div className="card overflow-hidden shadow-lg">
-          <AttendanceTable
-            workers={workers}
+        ) : (
+          <EmployeeDashboard 
+            employee={workers[0]}
             year={date.year}
             month={date.month}
-            isAdmin={isAdmin}
-            onDataUpdate={handleDataUpdate}
+            onDateChange={handleDateChange}
           />
-        </div>
+        )}
       </div>
       
       {isPayrollModalOpen &&
