@@ -6,10 +6,9 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { submitLeaveRequest } from "@/app/actions/leave";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +33,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LoadingSpinner from "../LoadingSpinner";
 
 const leaveRequestSchema = z.object({
@@ -65,36 +63,37 @@ export default function LeaveRequestForm({ employeeId, onSubmitted }: LeaveReque
   const { toast } = useToast();
   const form = useForm<LeaveRequestFormValues>({
     resolver: zodResolver(leaveRequestSchema),
+    defaultValues: {
+      notes: "",
+    }
   });
 
   const onSubmit = async (data: LeaveRequestFormValues) => {
     setLoading(true);
-    try {
-      const requestId = `leave_${employeeId}_${Date.now()}`;
-      await setDoc(doc(db, "leaveRequests", requestId), {
-        ...data,
-        employeeId,
-        startDate: format(data.startDate, "yyyy-MM-dd"),
-        endDate: format(data.endDate, "yyyy-MM-dd"),
-        status: "pending", // pending, approved, rejected
-        createdAt: serverTimestamp(),
-      });
+    const result = await submitLeaveRequest({
+      ...data,
+      employeeId,
+    });
+    setLoading(false);
 
+    if (result.success) {
       toast({
         title: "تم إرسال الطلب",
         description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
       });
       form.reset();
       onSubmitted?.();
-    } catch (error) {
-      console.error("Error submitting leave request: ", error);
+    } else {
+      console.error("Error submitting leave request: ", result.error);
+      const errorMessage = typeof result.error === 'string' 
+        ? result.error
+        : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.";
+      
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 

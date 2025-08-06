@@ -83,14 +83,13 @@ export interface Payslip {
 
 /**
  * Represents a leave request from an employee.
- * Stored in the 'leaveRequests' collection.
+ * Stored in a subcollection 'leaveRequests' under an employee document.
  */
 export interface LeaveRequest {
   id: string; // Document ID
-  employeeId: string;
   leaveType: 'annual' | 'sick' | 'emergency';
-  startDate: string; // ISO 8601 format (YYYY-MM-DD)
-  endDate: string; // ISO 8601 format (YYYY-MM-DD)
+  startDate: Timestamp; 
+  endDate: Timestamp;
   notes?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Timestamp;
