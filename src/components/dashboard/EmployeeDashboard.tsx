@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MONTHS, calculatePayroll, getFridaysInMonth } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { MONTHS, calculatePayroll } from '@/lib/utils';
 import type { Worker } from '@/types';
 import AttendanceTable from './AttendanceTable';
 import LeaveRequestForm from './LeaveRequestForm';
+import { FilePlus2 } from 'lucide-react';
 
 interface EmployeeDashboardProps {
   employee: Worker;
@@ -27,6 +31,8 @@ const StatCard = ({ title, value }: { title: string; value: string | number }) =
 
 
 export default function EmployeeDashboard({ employee, year, month, onDateChange }: EmployeeDashboardProps) {
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  
   if (!employee) {
     return <div className="text-center text-red-500">لا يمكن تحميل بيانات الموظف.</div>;
   }
@@ -36,14 +42,11 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
   const CURRENCY = 'ريال';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
-        <Card>
-          <CardHeader>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
             <CardTitle>نظرة عامة على راتب شهر {MONTHS[month]} {year}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2 justify-center sm:justify-start mt-2">
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
               <Select
                 value={String(month)}
                 onValueChange={(value) => onDateChange({ year, month: Number(value) })}
@@ -71,31 +74,42 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
                 </SelectContent>
               </Select>
             </div>
-            <StatCard title="صافي الراتب" value={`${netSalary.toFixed(2)} ${CURRENCY}`} />
-            <StatCard title="أيام الغياب" value={employee.absentDays || 0} />
-            <StatCard title="ساعات العمل الإضافي" value={(employee.totalOvertime || 0).toFixed(1)} />
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>جدول الحضور لشهر {MONTHS[month]} {year}</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <AttendanceTable
-              workers={[employee]}
-              year={year}
-              month={month}
-              isAdmin={false}
-              onDataUpdate={() => {}}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="lg:col-span-1">
-        <LeaveRequestForm employeeId={employee.id} />
-      </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard title="صافي الراتب" value={`${netSalary.toFixed(2)} ${CURRENCY}`} />
+          <StatCard title="أيام الغياب" value={employee.absentDays || 0} />
+          <StatCard title="ساعات العمل الإضافي" value={(employee.totalOvertime || 0).toFixed(1)} />
+           <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
+            <DialogTrigger asChild>
+                <Button className="h-full text-lg">
+                    <FilePlus2 className="mr-2 h-6 w-6" />
+                    تقديم طلب إجازة
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                <DialogTitle>تقديم طلب إجازة</DialogTitle>
+                </DialogHeader>
+                <LeaveRequestForm employeeId={employee.id} onSubmitted={() => setIsLeaveModalOpen(false)} />
+            </DialogContent>
+            </Dialog>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>جدول الحضور لشهر {MONTHS[month]} {year}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <AttendanceTable
+            workers={[employee]}
+            year={year}
+            month={month}
+            isAdmin={false}
+            onDataUpdate={() => {}}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
