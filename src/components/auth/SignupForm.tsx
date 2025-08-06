@@ -36,15 +36,20 @@ export default function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      const newDocId = Date.now().toString(); 
       const newEmployeeData = {
+        id: newDocId,
         authUid: user.uid,
         name: name,
         email: email,
         role: 'employee',
+        employeeId: `EMP${newDocId.slice(-4)}`,
+        jobTitle: '',
+        department: '',
+        hireDate: new Date().toISOString().split('T')[0],
         basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0, commission: 0, advances: 0, penalties: 0,
       };
 
-      const newDocId = Date.now().toString(); 
       await setDoc(doc(db, 'employees', newDocId), newEmployeeData);
 
       router.push("/");

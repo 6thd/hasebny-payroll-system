@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -32,8 +32,9 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
   const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name.includes('Salary') || name.includes('housing') ? parseFloat(value) || 0 : value }));
+    const { name, value, type } = e.target;
+    const isNumberField = type === 'number' || ['basicSalary', 'housing', 'workNature', 'transport', 'phone', 'food', 'commission', 'advances', 'penalties'].includes(name);
+    setFormData(prev => ({ ...prev, [name]: isNumberField ? parseFloat(value) || 0 : value }));
   };
 
   const selectEmployeeForEdit = (worker: Worker) => {
@@ -50,17 +51,25 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     e.preventDefault();
     if (!formData.name) return;
 
-    const workerId = isEditing ? formData.id : Date.now().toString();
-    if(!workerId) return;
-
-    const { id, days, ...workerDataToSave } = formData;
+    const workerId = isEditing && formData.id ? formData.id : Date.now().toString();
+    
+    const dataToSave = { ...formData };
+    if (!isEditing) {
+      dataToSave.id = workerId;
+      dataToSave.employeeId = `EMP${workerId.slice(-4)}`;
+      dataToSave.hireDate = new Date().toISOString().split('T')[0];
+    }
+    
+    // Remove properties that are not part of the employee document schema
+    const { days, totalRegular, totalOvertime, absentDays, ...employeeDataToSave } = dataToSave;
     
     try {
-      await setDoc(doc(db, 'employees', workerId), workerDataToSave, { merge: isEditing });
+      await setDoc(doc(db, 'employees', workerId), employeeDataToSave, { merge: true });
       toast({ title: isEditing ? 'تم تحديث الموظف' : 'تم إضافة الموظف' });
       onDataUpdate();
       resetForm();
     } catch (error) {
+      console.error(error);
       toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
     }
   };
@@ -95,7 +104,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                 <div key={w.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
                   <div>
                     <p className="font-semibold">{w.name}</p>
-                    <p className="text-sm text-muted-foreground">{w.department || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">{w.jobTitle || 'N/A'}</p>
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
@@ -127,7 +136,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                   <div><Label>الاسم</Label><Input name="name" value={formData.name || ''} onChange={handleInputChange} required /></div>
                   <div><Label>القسم</Label><Input name="department" value={formData.department || ''} onChange={handleInputChange} /></div>
                   <div><Label>الوظيفة</Label><Input name="jobTitle" value={formData.jobTitle || ''} onChange={handleInputChange} /></div>
-                  <div><Label>الوردية</Label><Input name="shift" value={formData.shift || ''} onChange={handleInputChange} /></div>
+                  <div><Label>تاريخ التعيين</Label><Input type="date" name="hireDate" value={(formData as any).hireDate || ''} onChange={handleInputChange} /></div>
+                  <div><Label>الرقم الوظيفي</Label><Input name="employeeId" value={(formData as any).employeeId || ''} onChange={handleInputChange} /></div>
                 </div>
                 <h4 className="font-semibold pt-4 border-t">البيانات المالية</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
