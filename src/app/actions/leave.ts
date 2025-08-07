@@ -87,7 +87,7 @@ export async function approveLeaveRequest(requestId: string) {
                 return { success: false, error: 'لم يتم العثور على بيانات الموظف.' };
             }
             const employeeData = employeeSnap.data();
-            const hireDate = new Date(employeeData.hireDate);
+            const hireDate = employeeData.hireDate ? new Date(employeeData.hireDate) : new Date(); // Fallback to current date if hireDate is missing
             const currentDate = new Date();
             
             let serviceYearStart = new Date(currentDate.getFullYear(), hireDate.getMonth(), hireDate.getDate());
@@ -101,8 +101,8 @@ export async function approveLeaveRequest(requestId: string) {
                 where('employeeId', '==', employeeId),
                 where('status', '==', 'approved'),
                 where('leaveType', '==', 'annual'),
-                where('startDate', '>=', serviceYearStart),
-                where('startDate', '<', serviceYearEnd)
+                where('startDate', '>=', Timestamp.fromDate(serviceYearStart)),
+                where('startDate', '<', Timestamp.fromDate(serviceYearEnd))
             );
 
             const approvedLeavesSnap = await getDocs(q);
@@ -190,7 +190,7 @@ export async function rejectLeaveRequest(requestId: string) {
         
         await createNotification(
             requestSnap.data().employeeId,
-            'تم رفض طلب الإجازة الخاص بك.'
+            'تم رفض طلب الإجازة الخاص بك من قبل الإدارة.'
         );
 
         revalidatePath('/');
