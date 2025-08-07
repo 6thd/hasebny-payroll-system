@@ -117,22 +117,22 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-center my-6 no-print">
+            <div className="flex flex-wrap gap-4 justify-center my-6 no-print">
               <Button onClick={() => setPayrollModalOpen(true)}>
-                <CircleDollarSign className="mr-2 h-4 w-4" />
+                <CircleDollarSign className="ml-2 h-4 w-4" />
                 مسير الرواتب
               </Button>
               <Button onClick={() => setEmployeeModalOpen(true)}>
-                <Users className="mr-2 h-4 w-4" />
+                <Users className="ml-2 h-4 w-4" />
                 إدارة الموظفين
               </Button>
-              <Button onClick={handlePrint} variant="outline">
-                <Printer className="mr-2 h-4 w-4" />
-                طباعة التقرير
-              </Button>
               <Button onClick={() => exportToExcel(workers, date.year, date.month)} variant="outline">
-                <FileDown className="mr-2 h-4 w-4" />
+                <FileDown className="ml-2 h-4 w-4" />
                 تصدير Excel
+              </Button>
+               <Button onClick={handlePrint} variant="outline">
+                <Printer className="ml-2 h-4 w-4" />
+                طباعة التقرير
               </Button>
             </div>
             <div className="card overflow-hidden shadow-lg">
