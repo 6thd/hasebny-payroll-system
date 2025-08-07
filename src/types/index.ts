@@ -25,6 +25,7 @@ export interface Worker {
   transport: number;
   phone: number;
   food: number;
+  // These are now monthly and will be populated from a separate collection
   commission: number;
   advances: number;
   penalties: number;
@@ -44,6 +45,17 @@ export interface PayrollData {
   grossSalary: number;
   totalDeductions: number;
 }
+
+/**
+ * Represents monthly variable financial data for an employee.
+ * Stored in collections like 'salaries_YYYY_MM'.
+ */
+export interface MonthlyData {
+    commission: number;
+    advances: number;
+    penalties: number;
+}
+
 
 // New data structures for Firestore
 

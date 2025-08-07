@@ -20,10 +20,11 @@ interface EmployeeManagementModalProps {
   onDataUpdate: () => void;
 }
 
+// NOTE: This component only deals with permanent employee data.
+// Monthly variables (commission, advances, penalties) are managed in PayrollModal.
 const initialFormState: Partial<Worker> = {
   id: '', name: '', department: '', jobTitle: '', shift: 'الوردية النهارية', role: 'employee',
   basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0,
-  commission: 0, advances: 0, penalties: 0,
 };
 
 export default function EmployeeManagementModal({ isOpen, onClose, workers, onDataUpdate }: EmployeeManagementModalProps) {
@@ -33,7 +34,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    const isNumberField = type === 'number' || ['basicSalary', 'housing', 'workNature', 'transport', 'phone', 'food', 'commission', 'advances', 'penalties'].includes(name);
+    // Note: this list does NOT include commission, advances, penalties
+    const isNumberField = type === 'number' || ['basicSalary', 'housing', 'workNature', 'transport', 'phone', 'food'].includes(name);
     setFormData(prev => ({ ...prev, [name]: isNumberField ? parseFloat(value) || 0 : value }));
   };
 
@@ -61,7 +63,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     }
     
     // Remove properties that are not part of the employee document schema
-    const { days, totalRegular, totalOvertime, absentDays, ...employeeDataToSave } = dataToSave;
+    // or are managed elsewhere.
+    const { days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
     
     try {
       await setDoc(doc(db, 'employees', workerId), employeeDataToSave, { merge: true });
@@ -76,6 +79,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
   const handleDelete = async (workerId: string) => {
     try {
+      // Note: This only deletes the employee record. Monthly salary records will remain
+      // but will be orphaned. For a production app, a cleanup function would be needed.
       await deleteDoc(doc(db, 'employees', workerId));
       toast({ title: 'تم حذف الموظف' });
       onDataUpdate();
@@ -88,8 +93,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     { key: 'basicSalary', label: 'الراتب الأساسي' }, { key: 'housing', label: 'بدل سكن' },
     { key: 'workNature', label: 'طبيعة عمل' }, { key: 'transport', label: 'مواصلات' },
     { key: 'phone', label: 'هاتف' }, { key: 'food', label: 'طعام' },
-    { key: 'commission', label: 'عمولة' }, { key: 'advances', label: 'سلف' },
-    { key: 'penalties', label: 'جزاءات' },
   ];
 
   return (
@@ -139,12 +142,13 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                   <div><Label>تاريخ التعيين</Label><Input type="date" name="hireDate" value={(formData as any).hireDate || ''} onChange={handleInputChange} /></div>
                   <div><Label>الرقم الوظيفي</Label><Input name="employeeId" value={(formData as any).employeeId || ''} onChange={handleInputChange} /></div>
                 </div>
-                <h4 className="font-semibold pt-4 border-t">البيانات المالية</h4>
+                <h4 className="font-semibold pt-4 border-t">البيانات المالية الثابتة</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {financialFields.map(field => (
                     <div key={field.key}><Label>{field.label}</Label><Input type="number" name={field.key} value={formData[field.key] as number || ''} onChange={handleInputChange} /></div>
                   ))}
                 </div>
+                 <p className="text-sm text-muted-foreground pt-4 border-t">ملاحظة: العمولات والسلف والجزاءات يتم إدخالها من شاشة مسير الرواتب لكل شهر على حدة.</p>
                 <div className="flex justify-end gap-2 pt-4">
                    <Button type="button" variant="outline" onClick={resetForm}>
                     {isEditing ? 'إلغاء التعديل' : 'مسح النموذج'}

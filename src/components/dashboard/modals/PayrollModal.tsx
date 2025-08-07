@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Worker, PayrollData } from '@/types';
+import { Worker, PayrollData, MonthlyData } from '@/types';
 import { calculatePayroll, MONTHS } from '@/lib/utils';
 import PredictiveAnalysis from '../PredictiveAnalysis';
 import { exportToExcel } from '@/lib/xlsx';
@@ -25,11 +25,37 @@ interface PayrollModalProps {
 }
 
 export default function PayrollModal({ isOpen, onClose, workers: initialWorkers, year, month }: PayrollModalProps) {
-  const [workers, setWorkers] = useState(initialWorkers);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [payrolls, setPayrolls] = useState<{ [key: string]: PayrollData }>({});
   const [isPrinting, setIsPrinting] = useState(false);
   const { toast } = useToast();
   const tableRef = useRef<HTMLTableElement>(null);
+
+
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+        const salaryCollectionName = `salaries_${year}_${month + 1}`;
+        const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
+        const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
+        monthlyDocsSnap.forEach(doc => {
+            monthlyDataMap[doc.id] = doc.data() as MonthlyData;
+        });
+
+        const workersWithMonthlyData = initialWorkers.map(w => ({
+            ...w,
+            commission: monthlyDataMap[w.id]?.commission || 0,
+            advances: monthlyDataMap[w.id]?.advances || 0,
+            penalties: monthlyDataMap[w.id]?.penalties || 0,
+        }));
+        
+        setWorkers(workersWithMonthlyData);
+        recomputePayrolls(workersWithMonthlyData);
+    };
+
+    if (initialWorkers.length > 0) {
+        fetchMonthlyData();
+    }
+  }, [initialWorkers, year, month]);
 
 
   const recomputePayrolls = (currentWorkers: Worker[]) => {
@@ -40,11 +66,6 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
     setPayrolls(newPayrolls);
   };
 
-  useEffect(() => {
-    setWorkers(initialWorkers);
-    recomputePayrolls(initialWorkers);
-  }, [initialWorkers, year, month]);
-
   const handleInputChange = (workerId: string, field: keyof Worker, value: string) => {
     const updatedWorkers = workers.map(w =>
       w.id === workerId ? { ...w, [field]: Number(value) || 0 } : w
@@ -54,12 +75,27 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
   };
 
   const handleSave = async (worker: Worker) => {
-    const { id, days, totalRegular, totalOvertime, absentDays, ...workerData } = worker;
+    const { id, days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...permanentWorkerData } = worker;
+    
+    // Data that is specific to the month
+    const monthlyData: MonthlyData = {
+        commission: commission || 0,
+        advances: advances || 0,
+        penalties: penalties || 0,
+    };
+
     try {
-      await setDoc(doc(db, 'employees', worker.id), workerData, { merge: true });
+      // Save permanent data to the 'employees' collection
+      await setDoc(doc(db, 'employees', worker.id), permanentWorkerData, { merge: true });
+
+      // Save monthly data to the specific salary collection for that month
+      const salaryCollectionName = `salaries_${year}_${month + 1}`;
+      await setDoc(doc(db, salaryCollectionName, worker.id), monthlyData);
+
       toast({ title: `تم حفظ بيانات ${worker.name}` });
     } catch (error) {
       toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
+      console.error("Error saving payroll data: ", error);
     }
   };
 
@@ -92,7 +128,10 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
   const financialFields: { key: keyof Worker, label: string }[] = [
     { key: 'basicSalary', label: 'الأساسي' }, { key: 'housing', label: 'سكن' }, { key: 'workNature', label: 'طبيعة عمل' },
     { key: 'transport', label: 'مواصلات' }, { key: 'phone', label: 'هاتف' }, { key: 'food', label: 'طعام' },
-    { key: 'commission', label: 'عمولة' },
+  ];
+  // These fields are now monthly
+  const monthlyFields: { key: keyof Worker, label: string }[] = [
+     { key: 'commission', label: 'عمولة' },
   ];
   const deductionFields: { key: keyof Worker, label: string }[] = [
     { key: 'advances', label: 'سلف' }, { key: 'penalties', label: 'جزاءات' },
@@ -104,7 +143,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
         <DialogHeader className="no-print flex-shrink-0">
           <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
-            يمكنك تعديل القيم المالية للموظفين هنا. سيتم إعادة حساب القيم المشتقة تلقائياً.
+            يمكنك تعديل القيم المالية للموظفين هنا. سيتم إعادة حساب القيم المشتقة تلقائياً. البيانات المتغيرة (عمولة, سلف, جزاءات) تحفظ للشهر الحالي فقط.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0 overflow-auto">
@@ -113,13 +152,14 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                     <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
-                    <TableHead colSpan={financialFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
+                    <TableHead colSpan={financialFields.length + monthlyFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
                     <TableHead colSpan={deductionFields.length + 1} className="text-center text-red-600">الاستقطاعات</TableHead>
                     <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
                     <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
                 </TableRow>
                 <TableRow>
                     {financialFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
+                    {monthlyFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
                     <TableHead>إضافي</TableHead>
                     {deductionFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
                     <TableHead>غياب</TableHead>
@@ -129,12 +169,20 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 {workers.map(worker => (
                     <TableRow key={worker.id}>
                     <TableCell className="font-semibold sticky rtl:right-0 ltr:left-0 bg-background z-10">{worker.name}</TableCell>
+                    {/* Permanent financial fields */}
                     {financialFields.map(f => (
                         <TableCell key={f.key}>
                         <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
                         </TableCell>
                     ))}
+                    {/* Monthly financial fields */}
+                     {monthlyFields.map(f => (
+                        <TableCell key={f.key}>
+                        <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
+                        </TableCell>
+                    ))}
                     <TableCell className="text-green-600">{payrolls[worker.id]?.overtimePay.toFixed(2)}</TableCell>
+                    {/* Monthly deduction fields */}
                     {deductionFields.map(f => (
                         <TableCell key={f.key}>
                         <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
