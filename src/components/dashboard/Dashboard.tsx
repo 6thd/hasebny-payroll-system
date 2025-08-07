@@ -121,13 +121,15 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="card overflow-hidden shadow-lg no-print">
-              <AttendanceTable
-                workers={workers}
-                year={date.year}
-                month={date.month}
-                isAdmin={isAdmin}
-                onDataUpdate={handleDataUpdate}
-              />
+              <div className="w-full overflow-x-auto">
+                <AttendanceTable
+                  workers={workers}
+                  year={date.year}
+                  month={date.month}
+                  isAdmin={isAdmin}
+                  onDataUpdate={handleDataUpdate}
+                />
+              </div>
             </div>
           </>
         ) : (
@@ -148,7 +150,6 @@ export default function Dashboard() {
           workers={workers}
           year={date.year}
           month={date.month}
-          onDataUpdate={handleDataUpdate}
         />
       }
 

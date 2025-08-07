@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { Check, X, Calendar as CalendarIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -46,7 +46,7 @@ export default function LeaveRequestsAdmin() {
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'leaveRequests'), where('status', '==', 'pending'));
+            const q = query(collection(db, 'leaveRequests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
             const pendingRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             setRequests(pendingRequests);
@@ -106,6 +106,7 @@ export default function LeaveRequestsAdmin() {
                     ) : requests.length === 0 ? (
                         <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة معلقة حاليًا.</p>
                     ) : (
+                        <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -120,10 +121,10 @@ export default function LeaveRequestsAdmin() {
                             <TableBody>
                                 {requests.map(req => (
                                     <TableRow key={req.id}>
-                                        <TableCell className="font-medium">{req.employeeName}</TableCell>
+                                        <TableCell className="font-medium whitespace-nowrap">{req.employeeName}</TableCell>
                                         <TableCell><Badge variant="secondary">{leaveTypeMap[req.leaveType] || req.leaveType}</Badge></TableCell>
-                                        <TableCell>{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                        <TableCell>{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
                                         <TableCell>{req.notes || '-'}</TableCell>
                                         <TableCell className="text-center space-x-2 rtl:space-x-reverse">
                                             <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleOpenEditModal(req)}>
@@ -137,6 +138,7 @@ export default function LeaveRequestsAdmin() {
                                 ))}
                             </TableBody>
                         </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -150,7 +152,7 @@ export default function LeaveRequestsAdmin() {
                         <div className="space-y-4 py-4">
                             <p>الموظف: <span className="font-semibold">{selectedRequest.employeeName}</span></p>
                             <div className="flex flex-col space-y-2">
-                                <label>تاريخ البدء</label>
+                                <label className="text-sm font-medium">تاريخ البدء</label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button
@@ -167,7 +169,7 @@ export default function LeaveRequestsAdmin() {
                                 </Popover>
                             </div>
                              <div className="flex flex-col space-y-2">
-                                <label>تاريخ الانتهاء</label>
+                                <label className="text-sm font-medium">تاريخ الانتهاء</label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button

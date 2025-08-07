@@ -92,7 +92,7 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
                 return { success: false, error: 'لم يتم العثور على بيانات الموظف.' };
             }
             const employeeData = employeeSnap.data();
-            const hireDate = employeeData.hireDate ? new Date(employeeData.hireDate) : new Date(); // Fallback to current date if hireDate is missing
+            const hireDate = employeeData.hireDate ? new Date(employeeData.hireDate) : new Date();
             const currentDate = new Date();
             
             let serviceYearStart = new Date(currentDate.getFullYear(), hireDate.getMonth(), hireDate.getDate());
@@ -101,13 +101,12 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             }
             const serviceYearEnd = new Date(serviceYearStart.getFullYear() + 1, serviceYearStart.getMonth(), serviceYearStart.getDate());
 
+            // Simplified query to avoid composite index
             const q = query(
                 collection(db, 'leaveRequests'),
                 where('employeeId', '==', employeeId),
                 where('status', '==', 'approved'),
-                where('leaveType', '==', 'annual'),
-                where('startDate', '>=', Timestamp.fromDate(serviceYearStart)),
-                where('startDate', '<', Timestamp.fromDate(serviceYearEnd))
+                where('leaveType', '==', 'annual')
             );
 
             const approvedLeavesSnap = await getDocs(q);
@@ -115,8 +114,11 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             approvedLeavesSnap.forEach(doc => {
                 const req = doc.data();
                 const reqStart = req.startDate.toDate();
-                const reqEnd = req.endDate.toDate();
-                daysTaken += (reqEnd.getTime() - reqStart.getTime()) / (1000 * 3600 * 24) + 1;
+                // Filter by service year client-side
+                if (reqStart >= serviceYearStart && reqStart < serviceYearEnd) {
+                    const reqEnd = req.endDate.toDate();
+                    daysTaken += (reqEnd.getTime() - reqStart.getTime()) / (1000 * 3600 * 24) + 1;
+                }
             });
 
             const newLeaveDuration = (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1;
@@ -147,7 +149,6 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             const day = d.getDate();
             const attendanceDocRef = doc(db, `attendance_${year}_${month}`, employeeId);
 
-            // Using set with merge to create or update the attendance document
             const fieldPath = `days.${day}`;
             batch.set(attendanceDocRef, {
                 days: {
