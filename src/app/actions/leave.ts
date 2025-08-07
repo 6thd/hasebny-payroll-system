@@ -1,13 +1,13 @@
 'use server';
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
 const leaveRequestSchema = z.object({
   employeeId: z.string(),
-  employeeName: z.string(), // Added employeeName
+  employeeName: z.string(),
   leaveType: z.string(),
   startDate: z.date(),
   endDate: z.date(),
@@ -27,10 +27,9 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
   }
 
   try {
-    // Storing leave requests in a top-level collection for easier querying by admins
     await addDoc(collection(db, 'leaveRequests'), {
       ...validation.data,
-      status: 'pending', // pending, approved, rejected
+      status: 'pending', 
       createdAt: serverTimestamp(),
     });
 
@@ -46,14 +45,39 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
   }
 }
 
+async function createNotification(employeeId: string, message: string) {
+  try {
+    await addDoc(collection(db, 'notifications'), {
+      employeeId,
+      message,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    // We don't want to fail the whole operation if notification fails
+  }
+}
 
 export async function approveLeaveRequest(requestId: string) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
+        const requestSnap = await getDoc(requestRef);
+
+        if (!requestSnap.exists()) {
+            return { success: false, error: 'لم يتم العثور على الطلب.' };
+        }
+        
         await updateDoc(requestRef, {
             status: 'approved',
             reviewedAt: serverTimestamp(),
         });
+        
+        await createNotification(
+            requestSnap.data().employeeId, 
+            'تمت الموافقة على طلب الإجازة الخاص بك.'
+        );
+
         revalidatePath('/');
         return { success: true };
     } catch (error) {
@@ -65,10 +89,22 @@ export async function approveLeaveRequest(requestId: string) {
 export async function rejectLeaveRequest(requestId: string) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
+        const requestSnap = await getDoc(requestRef);
+
+        if (!requestSnap.exists()) {
+            return { success: false, error: 'لم يتم العثور على الطلب.' };
+        }
+
         await updateDoc(requestRef, {
             status: 'rejected',
             reviewedAt: serverTimestamp(),
         });
+        
+        await createNotification(
+            requestSnap.data().employeeId,
+            'تم رفض طلب الإجازة الخاص بك.'
+        );
+
         revalidatePath('/');
         return { success: true };
     } catch (error) {
