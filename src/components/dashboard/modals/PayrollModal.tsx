@@ -22,10 +22,9 @@ interface PayrollModalProps {
   workers: Worker[];
   year: number;
   month: number;
-  onDataUpdate: () => void;
 }
 
-export default function PayrollModal({ isOpen, onClose, workers: initialWorkers, year, month, onDataUpdate }: PayrollModalProps) {
+export default function PayrollModal({ isOpen, onClose, workers: initialWorkers, year, month }: PayrollModalProps) {
   const [workers, setWorkers] = useState(initialWorkers);
   const [payrolls, setPayrolls] = useState<{ [key: string]: PayrollData }>({});
   const [isPrinting, setIsPrinting] = useState(false);
@@ -59,7 +58,6 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
     try {
       await setDoc(doc(db, 'employees', worker.id), workerData, { merge: true });
       toast({ title: `تم حفظ بيانات ${worker.name}` });
-      onDataUpdate();
     } catch (error) {
       toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
     }
@@ -102,7 +100,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl h-[90vh] flex flex-col printable">
+      <DialogContent className="max-w-7xl flex flex-col h-[90vh]">
         <DialogHeader className="no-print flex-shrink-0">
           <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
@@ -110,7 +108,8 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0 overflow-auto">
-            <Table ref={tableRef}>
+          <div ref={tableRef} className="min-w-0">
+            <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                     <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
@@ -151,6 +150,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 ))}
                 </TableBody>
             </Table>
+            </div>
         </div>
         <DialogFooter className="no-print gap-2 flex-shrink-0 pt-4">
             <Button onClick={() => exportToExcel(workers, year, month)} variant="outline" disabled={isPrinting}>
