@@ -18,6 +18,7 @@ import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import { exportToExcel } from '@/lib/xlsx';
 import EmployeeDashboard from './EmployeeDashboard';
 import LeaveRequestsAdmin from './LeaveRequestsAdmin';
+import EmployeesOnLeave from './EmployeesOnLeave';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -107,8 +108,13 @@ export default function Dashboard() {
             <KPIs workers={workers} year={date.year} month={date.month} />
             <Charts workers={workers} year={date.year} month={date.month} />
             
-            <div className="my-8">
-              <LeaveRequestsAdmin />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
+                <div className="md:col-span-2">
+                    <LeaveRequestsAdmin />
+                </div>
+                <div>
+                    <EmployeesOnLeave />
+                </div>
             </div>
 
             <div className="flex flex-wrap gap-2 justify-center my-6 no-print">
