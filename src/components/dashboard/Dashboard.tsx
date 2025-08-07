@@ -102,7 +102,7 @@ export default function Dashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
                   <div className="md:col-span-2">
-                      <LeaveRequestsAdmin />
+                      <LeaveRequestsAdmin onAction={handleDataUpdate} />
                   </div>
                   <div>
                       <EmployeesOnLeave />
@@ -111,17 +111,16 @@ export default function Dashboard() {
 
               <div className="flex flex-wrap gap-4 justify-center my-6">
                 <Button onClick={() => setPayrollModalOpen(true)}>
-                  <CircleDollarSign className="ml-2 h-4 w-4" />
+                  <CircleDollarSign className="mr-2 h-4 w-4" />
                   مسير الرواتب
                 </Button>
                 <Button onClick={() => setEmployeeModalOpen(true)}>
-                  <Users className="ml-2 h-4 w-4" />
+                  <Users className="mr-2 h-4 w-4" />
                   إدارة الموظفين
                 </Button>
               </div>
             </div>
             <div className="card overflow-hidden shadow-lg no-print">
-              <div className="w-full overflow-x-auto">
                 <AttendanceTable
                   workers={workers}
                   year={date.year}
@@ -129,7 +128,6 @@ export default function Dashboard() {
                   isAdmin={isAdmin}
                   onDataUpdate={handleDataUpdate}
                 />
-              </div>
             </div>
           </>
         ) : (

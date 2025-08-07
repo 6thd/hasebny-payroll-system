@@ -9,6 +9,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { UserCheck, CalendarClock } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { useAuth } from '@/hooks/use-auth';
 
 interface LeaveRequest {
     id: string;
@@ -52,6 +53,7 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
 );
 
 export default function EmployeesOnLeave() {
+    const { user } = useAuth();
     const [onLeave, setOnLeave] = useState<LeaveRequest[]>([]);
     const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -64,9 +66,7 @@ export default function EmployeesOnLeave() {
             today.setHours(0, 0, 0, 0);
 
             // Fetch all leave requests and filter client-side to avoid complex index requirements.
-            const q = query(
-                collection(db, 'leaveRequests')
-            );
+            const q = query(collection(db, 'leaveRequests'));
 
             const querySnapshot = await getDocs(q);
             const allLeaves = querySnapshot.docs
@@ -109,8 +109,12 @@ export default function EmployeesOnLeave() {
     }, [toast]);
 
     useEffect(() => {
-        fetchOnLeaveEmployees();
-    }, [fetchOnLeaveEmployees]);
+        // A simple way to trigger re-fetch when actions happen in other components.
+        // In a real app, a more robust state management (like Context or Zustand) would be better.
+        if(user){
+            fetchOnLeaveEmployees();
+        }
+    }, [user, fetchOnLeaveEmployees]);
 
     return (
         <Card className="shadow-md no-print h-full">
