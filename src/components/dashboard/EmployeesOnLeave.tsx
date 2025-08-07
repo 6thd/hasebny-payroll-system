@@ -67,7 +67,7 @@ export default function EmployeesOnLeave() {
                 collection(db, 'leaveRequests'),
                 where('status', '==', 'approved'),
                 where('endDate', '>=', todayTimestamp),
-                orderBy('endDate', 'asc') 
+                orderBy('startDate', 'asc')
             );
 
             const querySnapshot = await getDocs(q);
@@ -85,9 +85,6 @@ export default function EmployeesOnLeave() {
                     upcoming.push(leave);
                 }
             });
-
-            // Sort upcoming leaves by start date separately as we order by end date in query
-            upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
 
             setOnLeave(active);
             setUpcomingLeaves(upcoming);
