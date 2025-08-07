@@ -31,17 +31,22 @@ export default function EmployeesOnLeave() {
     const fetchOnLeaveEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const today = Timestamp.now();
+            const today = new Date(); // Use JS Date for client-side comparison
+            today.setHours(0, 0, 0, 0); // Normalize to start of day
+
             const q = query(
                 collection(db, 'leaveRequests'), 
-                where('status', '==', 'approved'),
-                where('startDate', '<=', today)
+                where('status', '==', 'approved')
             );
 
             const querySnapshot = await getDocs(q);
             const activeLeaves = querySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as OnLeaveEmployee))
-                .filter(leave => leave.endDate >= today);
+                .filter(leave => {
+                    const startDate = leave.startDate.toDate();
+                    const endDate = leave.endDate.toDate();
+                    return startDate <= today && endDate >= today;
+                });
 
             setOnLeave(activeLeaves);
         } catch (error) {
