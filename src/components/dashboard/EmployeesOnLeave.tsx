@@ -63,16 +63,17 @@ export default function EmployeesOnLeave() {
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = Timestamp.fromDate(today);
 
+            // Simplified query to avoid composite index issue
             const q = query(
                 collection(db, 'leaveRequests'),
                 where('status', '==', 'approved'),
-                where('endDate', '>=', todayTimestamp),
-                orderBy('startDate', 'asc')
+                where('endDate', '>=', todayTimestamp)
             );
 
             const querySnapshot = await getDocs(q);
             const allApprovedLeaves = querySnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                .map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest))
+                .sort((a, b) => a.startDate.toMillis() - b.startDate.toMillis()); // Sort manually
 
             const active: LeaveRequest[] = [];
             const upcoming: LeaveRequest[] = [];
