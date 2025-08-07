@@ -1,12 +1,13 @@
 'use server';
 
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
 const leaveRequestSchema = z.object({
   employeeId: z.string(),
+  employeeName: z.string(), // Added employeeName
   leaveType: z.string(),
   startDate: z.date(),
   endDate: z.date(),
@@ -25,17 +26,15 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
     };
   }
 
-  const { employeeId, ...leaveData } = validation.data;
-
   try {
-    await addDoc(collection(db, 'employees', employeeId, 'leaveRequests'), {
-      ...leaveData,
+    // Storing leave requests in a top-level collection for easier querying by admins
+    await addDoc(collection(db, 'leaveRequests'), {
+      ...validation.data,
       status: 'pending', // pending, approved, rejected
       createdAt: serverTimestamp(),
     });
 
-    // We can revalidate paths if we had a page to show leave requests
-    // revalidatePath('/dashboard'); 
+    revalidatePath('/'); 
 
     return { success: true };
   } catch (error) {
@@ -45,4 +44,35 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
       error: 'حدث خطأ أثناء إرسال الطلب.',
     };
   }
+}
+
+
+export async function approveLeaveRequest(requestId: string) {
+    try {
+        const requestRef = doc(db, 'leaveRequests', requestId);
+        await updateDoc(requestRef, {
+            status: 'approved',
+            reviewedAt: serverTimestamp(),
+        });
+        revalidatePath('/');
+        return { success: true };
+    } catch (error) {
+        console.error('Error approving leave request:', error);
+        return { success: false, error: 'حدث خطأ أثناء الموافقة على الطلب.' };
+    }
+}
+
+export async function rejectLeaveRequest(requestId: string) {
+    try {
+        const requestRef = doc(db, 'leaveRequests', requestId);
+        await updateDoc(requestRef, {
+            status: 'rejected',
+            reviewedAt: serverTimestamp(),
+        });
+        revalidatePath('/');
+        return { success: true };
+    } catch (error) {
+        console.error('Error rejecting leave request:', error);
+        return { success: false, error: 'حدث خطأ أثناء رفض الطلب.' };
+    }
 }

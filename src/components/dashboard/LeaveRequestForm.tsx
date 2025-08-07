@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import LoadingSpinner from "../LoadingSpinner";
+import { useAuth } from "@/hooks/use-auth";
 
 const leaveRequestSchema = z.object({
   leaveType: z.string({
@@ -54,13 +55,14 @@ const leaveRequestSchema = z.object({
 type LeaveRequestFormValues = z.infer<typeof leaveRequestSchema>;
 
 interface LeaveRequestFormProps {
-  employeeId: string;
   onSubmitted?: () => void;
 }
 
-export default function LeaveRequestForm({ employeeId, onSubmitted }: LeaveRequestFormProps) {
+export default function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth(); // Get current user
+  
   const form = useForm<LeaveRequestFormValues>({
     resolver: zodResolver(leaveRequestSchema),
     defaultValues: {
@@ -69,10 +71,16 @@ export default function LeaveRequestForm({ employeeId, onSubmitted }: LeaveReque
   });
 
   const onSubmit = async (data: LeaveRequestFormValues) => {
+    if (!user) {
+      toast({ title: "خطأ", description: "يجب أن تكون مسجلاً لتقديم طلب.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     const result = await submitLeaveRequest({
       ...data,
-      employeeId,
+      employeeId: user.id,
+      employeeName: user.name || user.email || 'غير معروف',
     });
     setLoading(false);
 

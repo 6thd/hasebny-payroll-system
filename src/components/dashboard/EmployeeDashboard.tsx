@@ -90,7 +90,7 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
                 <DialogHeader>
                 <DialogTitle>تقديم طلب إجازة</DialogTitle>
                 </DialogHeader>
-                <LeaveRequestForm employeeId={employee.id} onSubmitted={() => setIsLeaveModalOpen(false)} />
+                <LeaveRequestForm onSubmitted={() => setIsLeaveModalOpen(false)} />
             </DialogContent>
             </Dialog>
         </CardContent>

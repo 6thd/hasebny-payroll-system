@@ -17,6 +17,7 @@ import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import { exportToExcel } from '@/lib/xlsx';
 import EmployeeDashboard from './EmployeeDashboard';
+import LeaveRequestsAdmin from './LeaveRequestsAdmin';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -102,6 +103,11 @@ export default function Dashboard() {
           <>
             <KPIs workers={workers} year={date.year} month={date.month} />
             <Charts workers={workers} year={date.year} month={date.month} />
+            
+            <div className="my-8">
+              <LeaveRequestsAdmin />
+            </div>
+
             <div className="flex flex-wrap gap-2 justify-center my-6 no-print">
               <Button onClick={() => setPayrollModalOpen(true)}>
                 <CircleDollarSign className="mr-2 h-4 w-4" />
