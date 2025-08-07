@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
@@ -53,6 +53,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
+            // Fetch all requests and filter/sort client-side to avoid complex indexes
             const q = query(collection(db, 'leaveRequests'));
             const querySnapshot = await getDocs(q);
 
@@ -74,6 +75,10 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
 
     useEffect(() => {
         fetchRequests();
+         // A simple way to trigger re-fetch when actions happen in other components.
+        const handleDataUpdate = () => fetchRequests();
+        window.addEventListener('data-updated', handleDataUpdate);
+        return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, [fetchRequests]);
 
     const handleOpenEditModal = (req: LeaveRequest) => {
@@ -89,8 +94,8 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
-            fetchRequests();
-            onAction?.();
+            fetchRequests(); // Re-fetch to update the list
+            onAction?.(); // Trigger global update
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
@@ -227,7 +232,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                             <Button variant="ghost" disabled={!!actionLoading}>إلغاء</Button>
                         </DialogClose>
                         <Button onClick={handleConfirmApproval} disabled={!!actionLoading}>
-                           {actionLoading && <LoadingSpinner />}
+                           {actionLoading ? <LoadingSpinner /> : null}
                            {actionLoading ? 'جارٍ الحفظ...' : 'تأكيد الموافقة'}
                         </Button>
                     </DialogFooter>

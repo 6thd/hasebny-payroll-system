@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Wallet, UserX, UserCheck } from 'lucide-react';
-import { Worker } from '@/types';
+import { Worker, MonthlyData } from '@/types';
 import { calculatePayroll } from '@/lib/utils';
 import LoadingSpinner from '../LoadingSpinner';
 
@@ -50,16 +50,31 @@ export default function AnalyticsKPIs() {
                 const month = today.getMonth();
                 
                 let totalPayroll = 0;
-                // Fetch attendance for all workers to calculate payroll
-                const attendancePromises = workers.map(w => getDocs(query(collection(db, `attendance_${year}_${month + 1}`), where('__name__', '==', w.id))));
-                const attendanceSnapshots = await Promise.all(attendancePromises);
-
-                const workersWithAttendance = workers.map((w, i) => {
-                    const attendanceDoc = attendanceSnapshots[i].docs[0];
-                    return { ...w, days: attendanceDoc ? attendanceDoc.data().days : {} };
-                });
                 
-                workersWithAttendance.forEach(w => {
+                // Fetch attendance for current month
+                const attendanceSnapshot = await getDocs(collection(db, `attendance_${year}_${month + 1}`));
+                const attendanceData: { [key: string]: any } = {};
+                attendanceSnapshot.forEach(doc => {
+                    attendanceData[doc.id] = doc.data().days;
+                });
+
+                // Fetch monthly financials for current month
+                const salaryCollectionName = `salaries_${year}_${month + 1}`;
+                const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
+                const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
+                monthlyDocsSnap.forEach(doc => {
+                    monthlyDataMap[doc.id] = doc.data() as MonthlyData;
+                });
+
+                const workersWithFullData = workers.map(w => ({
+                    ...w,
+                    days: attendanceData[w.id] || {},
+                    commission: monthlyDataMap[w.id]?.commission || 0,
+                    advances: monthlyDataMap[w.id]?.advances || 0,
+                    penalties: monthlyDataMap[w.id]?.penalties || 0,
+                }));
+                
+                workersWithFullData.forEach(w => {
                     totalPayroll += calculatePayroll(w, year, month).netSalary;
                 });
                 
@@ -99,7 +114,10 @@ export default function AnalyticsKPIs() {
             }
         };
 
+        const handleDataUpdate = () => fetchKpiData();
         fetchKpiData();
+        window.addEventListener('data-updated', handleDataUpdate);
+        return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, []);
 
 

@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { LineChart, Line, Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Worker } from '@/types';
-import { calculatePayroll, getAttendanceStatusForDay, MONTHS } from '@/lib/utils';
+import { Worker, MonthlyData } from '@/types';
+import { calculatePayroll, getAttendanceStatusForDay, MONTHS, processWorkerData } from '@/lib/utils';
 import { TrendingUp, PieChart as PieIcon } from 'lucide-react';
 import LoadingSpinner from '../LoadingSpinner';
 
@@ -50,16 +50,32 @@ export default function AnalyticsCharts() {
           const year = d.getFullYear();
           const month = d.getMonth();
 
+          // Fetch attendance
           const attendanceSnapshot = await getDocs(collection(db, `attendance_${year}_${month + 1}`));
           const attendanceData: { [key: string]: any } = {};
           attendanceSnapshot.forEach(doc => {
             attendanceData[doc.id] = doc.data().days;
           });
+
+          // Fetch monthly financials
+          const salaryCollectionName = `salaries_${year}_${month + 1}`;
+          const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
+          const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
+          monthlyDocsSnap.forEach(doc => {
+            monthlyDataMap[doc.id] = doc.data() as MonthlyData;
+          });
           
           let monthlyTotal = 0;
           workers.forEach(worker => {
-              const workerWithAttendance = { ...worker, days: attendanceData[worker.id] || {} };
-              monthlyTotal += calculatePayroll(workerWithAttendance, year, month).netSalary;
+              const workerWithAttendance = { 
+                ...worker, 
+                days: attendanceData[worker.id] || {},
+                commission: monthlyDataMap[worker.id]?.commission || 0,
+                advances: monthlyDataMap[worker.id]?.advances || 0,
+                penalties: monthlyDataMap[worker.id]?.penalties || 0,
+              };
+              const processedWorker = processWorkerData(workerWithAttendance, year, month);
+              monthlyTotal += calculatePayroll(processedWorker, year, month).netSalary;
           });
           
           payrollHistory.push({
@@ -74,23 +90,24 @@ export default function AnalyticsCharts() {
         const currentYear = today.getFullYear();
         const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
         
-        const attendanceSnapshot = await getDocs(collection(db, `attendance_${currentYear}_${currentMonth + 1}`));
-        const attendanceData: { [key: string]: any } = {};
-        attendanceSnapshot.forEach(doc => {
-          attendanceData[doc.id] = doc.data().days;
+        const currentAttendanceSnapshot = await getDocs(collection(db, `attendance_${currentYear}_${currentMonth + 1}`));
+        const currentAttendanceData: { [key: string]: any } = {};
+        currentAttendanceSnapshot.forEach(doc => {
+          currentAttendanceData[doc.id] = doc.data().days;
         });
         
-        const statusCount = { present: 0, on_leave: 0, absent: 0, weekend: 0, no_data: 0 };
-        workers.forEach(worker => {
-          for(let day = 1; day <= daysInMonth; day++) {
-            const dayData = attendanceData[worker.id]?.[day];
-            const isFriday = new Date(currentYear, currentMonth, day).getDay() === 5;
-            const status = getAttendanceStatusForDay(dayData, isFriday);
-            if (status !== 'no_data') {
-                statusCount[status]++;
+        const statusCount = { present: 0, on_leave: 0, absent: 0, weekend: 0 };
+        
+        for(const worker of workers) {
+            for(let day = 1; day <= daysInMonth; day++) {
+                const dayData = currentAttendanceData[worker.id]?.[day];
+                const isFriday = new Date(currentYear, currentMonth, day).getDay() === 5;
+                const status = getAttendanceStatusForDay(dayData, isFriday);
+                if (status !== 'no_data') {
+                    statusCount[status]++;
+                }
             }
-          }
-        });
+        }
 
         const finalPieData = [
             { name: 'حضور', value: statusCount.present, color: COLORS.present },
@@ -106,7 +123,11 @@ export default function AnalyticsCharts() {
         setLoading(false);
       }
     };
+    
+    const handleDataUpdate = () => fetchData();
     fetchData();
+    window.addEventListener('data-updated', handleDataUpdate);
+    return () => window.removeEventListener('data-updated', handleDataUpdate);
   }, []);
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import type { Worker } from '@/types';
+import type { Worker, MonthlyData } from '@/types';
 import { processWorkerData } from '@/lib/utils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
@@ -33,14 +33,13 @@ export default function Dashboard() {
     setLoading(true);
     try {
       let workersToLoad: Worker[] = [];
+      const employeesSnapshot = await getDocs(collection(db, 'employees'));
+
       if (user.role === 'admin') {
-        const employeesSnapshot = await getDocs(collection(db, 'employees'));
         workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       } else {
-        const q = query(collection(db, "employees"), where("authUid", "==", user.uid));
-        const employeeDocSnap = await getDocs(q);
-        if (!employeeDocSnap.empty) {
-            const userDoc = employeeDocSnap.docs[0];
+        const userDoc = employeesSnapshot.docs.find(doc => doc.data().authUid === user.uid);
+        if (userDoc) {
             workersToLoad = [{ id: userDoc.id, ...userDoc.data() } as Worker];
         }
       }
@@ -51,10 +50,24 @@ export default function Dashboard() {
       attendanceSnapshot.forEach(doc => {
         attendanceData[doc.id] = doc.data().days;
       });
+
+      // Fetch monthly financials for the selected month
+      const salaryCollectionName = `salaries_${date.year}_${date.month + 1}`;
+      const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
+      const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
+      monthlyDocsSnap.forEach(doc => {
+          monthlyDataMap[doc.id] = doc.data() as MonthlyData;
+      });
       
       const processedWorkers = workersToLoad.map(w => {
-        const workerWithAttendance = { ...w, days: attendanceData[w.id] || {} };
-        return processWorkerData(workerWithAttendance, date.year, date.month);
+        const workerWithFullData = { 
+          ...w, 
+          days: attendanceData[w.id] || {},
+          commission: monthlyDataMap[w.id]?.commission || 0,
+          advances: monthlyDataMap[w.id]?.advances || 0,
+          penalties: monthlyDataMap[w.id]?.penalties || 0,
+        };
+        return processWorkerData(workerWithFullData, date.year, date.month);
       });
       
       setWorkers(processedWorkers);
@@ -67,8 +80,10 @@ export default function Dashboard() {
   }, [user, date]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (user) {
+      fetchData();
+    }
+  }, [fetchData, user]);
 
   const handleDateChange = (newDate: { year: number; month: number }) => {
     setDate(newDate);
@@ -76,6 +91,7 @@ export default function Dashboard() {
 
   const handleDataUpdate = () => {
     fetchData();
+    window.dispatchEvent(new CustomEvent('data-updated'));
   };
 
   if (loading || !user) {
