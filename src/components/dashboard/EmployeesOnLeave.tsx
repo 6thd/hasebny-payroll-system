@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
-import { UserCheck, CalendarClock } from 'lucide-react';
+import { UserCheck, CalendarClock, UserX } from 'lucide-react';
 import { Separator } from '../ui/separator';
-import { useAuth } from '@/hooks/use-auth';
 
 interface LeaveRequest {
     id: string;
@@ -30,7 +29,7 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
     <div>
         <h4 className="flex items-center gap-2 text-md font-semibold mb-3 text-muted-foreground">
             {icon}
-            {title}
+            {title} ({leaves.length})
         </h4>
         {leaves.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-2">لا توجد بيانات.</p>
@@ -52,8 +51,11 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
     </div>
 );
 
-export default function EmployeesOnLeave() {
-    const { user } = useAuth();
+interface EmployeesOnLeaveProps {
+    onAction?: () => void;
+}
+
+export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
     const [onLeave, setOnLeave] = useState<LeaveRequest[]>([]);
     const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,13 +67,10 @@ export default function EmployeesOnLeave() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Fetch all leave requests and filter client-side to avoid complex index requirements.
             const q = query(collection(db, 'leaveRequests'));
 
             const querySnapshot = await getDocs(q);
-            const allLeaves = querySnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-                
+            const allLeaves = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             const approvedLeaves = allLeaves.filter(leave => leave.status === 'approved');
 
             const active: LeaveRequest[] = [];
@@ -80,11 +79,9 @@ export default function EmployeesOnLeave() {
             approvedLeaves.forEach(leave => {
                 const startDate = leave.startDate.toDate();
                 const endDate = leave.endDate.toDate();
-                endDate.setHours(23, 59, 59, 999); // Ensure end of day is included
+                endDate.setHours(23, 59, 59, 999); 
 
-                if (endDate < today) {
-                    return; // Skip past leaves
-                }
+                if (endDate < today) return; 
                 
                 if (startDate <= today) {
                     active.push(leave);
@@ -93,7 +90,6 @@ export default function EmployeesOnLeave() {
                 }
             });
             
-            // Sort leaves by start date
             active.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
             upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
 
@@ -109,19 +105,19 @@ export default function EmployeesOnLeave() {
     }, [toast]);
 
     useEffect(() => {
+        fetchOnLeaveEmployees();
         // A simple way to trigger re-fetch when actions happen in other components.
-        // In a real app, a more robust state management (like Context or Zustand) would be better.
-        if(user){
-            fetchOnLeaveEmployees();
-        }
-    }, [user, fetchOnLeaveEmployees]);
+        const handleDataUpdate = () => fetchOnLeaveEmployees();
+        window.addEventListener('data-updated', handleDataUpdate);
+        return () => window.removeEventListener('data-updated', handleDataUpdate);
+    }, [fetchOnLeaveEmployees]);
 
     return (
         <Card className="shadow-md no-print h-full">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <UserCheck />
-                    حالة الإجازات
+                    حالة الإجازات الحالية
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -134,13 +130,13 @@ export default function EmployeesOnLeave() {
                         <LeaveList 
                             title="في إجازة حاليًا" 
                             leaves={onLeave}
-                            icon={<UserCheck className="h-5 w-5" />}
+                            icon={<UserX className="h-5 w-5 text-orange-500" />}
                         />
                         <Separator />
                         <LeaveList 
                             title="إجازات قادمة" 
                             leaves={upcomingLeaves} 
-                            icon={<CalendarClock className="h-5 w-5" />}
+                            icon={<CalendarClock className="h-5 w-5 text-blue-500" />}
                         />
                     </div>
                 )}

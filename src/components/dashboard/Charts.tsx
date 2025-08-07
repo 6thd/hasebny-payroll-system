@@ -4,6 +4,7 @@ import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import type { Worker } from '@/types';
 import { calculatePayroll } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart3, PieChartIcon } from 'lucide-react';
 
 interface ChartsProps {
   workers: Worker[];
@@ -39,7 +40,7 @@ export default function Charts({ workers, year, month }: ChartsProps) {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8 no-print">
       <Card className="lg:col-span-3 shadow-md">
         <CardHeader>
-          <CardTitle>تحليل الرواتب حسب الأقسام</CardTitle>
+          <CardTitle className="flex items-center gap-2"><BarChart3 />تحليل الرواتب حسب الأقسام</CardTitle>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -54,7 +55,7 @@ export default function Charts({ workers, year, month }: ChartsProps) {
       </Card>
       <Card className="lg:col-span-2 shadow-md">
         <CardHeader>
-          <CardTitle>مكونات إجمالي الرواتب</CardTitle>
+          <CardTitle className="flex items-center gap-2"><PieChartIcon />مكونات إجمالي الرواتب</CardTitle>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">

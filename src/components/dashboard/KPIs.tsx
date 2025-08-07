@@ -11,7 +11,7 @@ interface KPIsProps {
 }
 
 const KPICard = ({ title, value }: { title: string; value: string | number }) => (
-  <Card className="shadow-md transition-all hover:shadow-lg">
+  <Card className="shadow-md transition-all hover:shadow-lg hover:scale-105">
     <CardHeader className="pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
     </CardHeader>

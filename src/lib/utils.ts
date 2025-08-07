@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { type Worker, type PayrollData } from "@/types";
+import { type Worker, type PayrollData, DayData } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -63,3 +63,20 @@ export function getFridaysInMonth(year: number, month: number): number[] {
 }
 
 export const MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+export function getAttendanceStatusForDay(dayData: DayData | undefined, isFriday: boolean): 'present' | 'absent' | 'on_leave' | 'weekend' | 'no_data' {
+    if (isFriday) return 'weekend';
+    if (!dayData) return 'no_data';
+    
+    switch (dayData.status) {
+        case 'present':
+            return 'present';
+        case 'absent':
+            return 'absent';
+        case 'annual_leave':
+        case 'sick_leave':
+            return 'on_leave';
+        default:
+            return 'no_data';
+    }
+}

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
-import { Check, X, Calendar as CalendarIcon, Edit } from 'lucide-react';
+import { Check, X, Calendar as CalendarIcon, Edit, Briefcase } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -36,13 +36,14 @@ const leaveTypeMap: { [key: string]: string } = {
 };
 
 interface LeaveRequestsAdminProps {
-    onAction: () => void;
+    onAction?: () => void;
+    itemCount?: number;
 }
 
-export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps) {
+export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveRequestsAdminProps) {
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [actionLoading, setActionLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
     const [newStartDate, setNewStartDate] = useState<Date | undefined>();
@@ -52,7 +53,6 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch all leave requests and filter/sort client-side to avoid composite indexes.
             const q = query(collection(db, 'leaveRequests'));
             const querySnapshot = await getDocs(q);
 
@@ -60,7 +60,8 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
             
             const pendingRequests = allRequests
                 .filter(req => req.status === 'pending')
-                .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()); // Sort descending by creation time
+                .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
+                .slice(0, itemCount);
 
             setRequests(pendingRequests);
         } catch (error) {
@@ -69,7 +70,7 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [toast, itemCount]);
 
     useEffect(() => {
         fetchRequests();
@@ -84,44 +85,56 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
 
     const handleConfirmApproval = async () => {
         if (!selectedRequest) return;
-        setActionLoading(true);
+        setActionLoading(selectedRequest.id);
         const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
-            fetchRequests(); // Re-fetch to update list
-            onAction(); // Notify parent to re-fetch other data if needed
+            fetchRequests();
+            onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
         setEditModalOpen(false);
         setSelectedRequest(null);
-        setActionLoading(false);
+        setActionLoading(null);
     };
 
+    const handleApproval = async (id: string) => {
+        setActionLoading(id);
+        const result = await approveLeaveRequest(id);
+        if (result.success) {
+            toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
+            fetchRequests();
+            onAction?.();
+        } else {
+            toast({ title: "خطأ", description: result.error, variant: "destructive" });
+        }
+        setActionLoading(null);
+    }
+    
     const handleReject = async (id: string) => {
-        setActionLoading(true);
+        setActionLoading(id);
         const result = await rejectLeaveRequest(id);
         if (result.success) {
             toast({ title: "تم الرفض", description: "تم رفض طلب الإجازة." });
             fetchRequests();
-            onAction();
+            onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
-        setActionLoading(false);
+        setActionLoading(null);
     };
 
-    const isLoading = loading || actionLoading;
 
     return (
         <>
-            <Card className="shadow-md no-print">
+            <Card className="shadow-md no-print h-full">
                 <CardHeader>
-                    <CardTitle>طلبات الإجازة المعلقة</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><Briefcase />أحدث طلبات الإجازة</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
-                        <div className="flex justify-center items-center h-24">
+                        <div className="flex justify-center items-center h-48">
                             <LoadingSpinner />
                         </div>
                     ) : requests.length === 0 ? (
@@ -132,10 +145,8 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>الموظف</TableHead>
-                                    <TableHead>نوع الإجازة</TableHead>
-                                    <TableHead>من تاريخ</TableHead>
-                                    <TableHead>إلى تاريخ</TableHead>
-                                    <TableHead>ملاحظات</TableHead>
+                                    <TableHead>النوع</TableHead>
+                                    <TableHead>المدة</TableHead>
                                     <TableHead className="text-center">إجراءات</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -144,18 +155,18 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
                                     <TableRow key={req.id}>
                                         <TableCell className="font-medium whitespace-nowrap">{req.employeeName}</TableCell>
                                         <TableCell><Badge variant="secondary">{leaveTypeMap[req.leaveType] || req.leaveType}</Badge></TableCell>
-                                        <TableCell className="whitespace-nowrap">{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                        <TableCell className="whitespace-nowrap">{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                        <TableCell>{req.notes || '-'}</TableCell>
+                                        <TableCell className="whitespace-nowrap text-xs">
+                                            {req.startDate.toDate().toLocaleDateString('ar-EG')} - {req.endDate.toDate().toLocaleDateString('ar-EG')}
+                                        </TableCell>
                                         <TableCell className="text-center space-x-1 rtl:space-x-reverse">
-                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => approveLeaveRequest(req.id).then(res => res.success ? (toast({ title: 'تمت الموافقة'}), fetchRequests(), onAction()) : toast({title: 'خطأ', description: res.error, variant: 'destructive'}))} disabled={isLoading}>
-                                                <Check className="h-5 w-5" />
+                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleApproval(req.id)} disabled={!!actionLoading}>
+                                                {actionLoading === req.id ? <LoadingSpinner /> : <Check className="h-5 w-5" />}
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="text-blue-600 hover:text-blue-700" onClick={() => handleOpenEditModal(req)} disabled={isLoading}>
+                                            <Button size="icon" variant="ghost" className="text-blue-600 hover:text-blue-700" onClick={() => handleOpenEditModal(req)} disabled={!!actionLoading}>
                                                 <Edit className="h-5 w-5" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)} disabled={isLoading}>
-                                                <X className="h-5 w-5" />
+                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)} disabled={!!actionLoading}>
+                                                {actionLoading === req.id ? <LoadingSpinner /> : <X className="h-5 w-5" />}
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -213,9 +224,9 @@ export default function LeaveRequestsAdmin({ onAction }: LeaveRequestsAdminProps
                     )}
                     <DialogFooter>
                         <DialogClose asChild>
-                            <Button variant="ghost" disabled={actionLoading}>إلغاء</Button>
+                            <Button variant="ghost" disabled={!!actionLoading}>إلغاء</Button>
                         </DialogClose>
-                        <Button onClick={handleConfirmApproval} disabled={actionLoading}>
+                        <Button onClick={handleConfirmApproval} disabled={!!actionLoading}>
                            {actionLoading && <LoadingSpinner />}
                            {actionLoading ? 'جارٍ الحفظ...' : 'تأكيد الموافقة'}
                         </Button>

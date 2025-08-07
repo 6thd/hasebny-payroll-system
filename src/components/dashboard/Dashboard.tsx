@@ -8,16 +8,13 @@ import type { Worker } from '@/types';
 import { processWorkerData } from '@/lib/utils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
-import KPIs from './KPIs';
-import Charts from './Charts';
 import AttendanceTable from './AttendanceTable';
 import { Button } from '../ui/button';
-import { Users, CircleDollarSign } from 'lucide-react';
+import { Users, CircleDollarSign, BarChart3 } from 'lucide-react';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import EmployeeDashboard from './EmployeeDashboard';
-import LeaveRequestsAdmin from './LeaveRequestsAdmin';
-import EmployeesOnLeave from './EmployeesOnLeave';
+import AdminAnalytics from './AdminAnalytics';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -29,6 +26,7 @@ export default function Dashboard() {
   });
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
   const [isEmployeeModalOpen, setEmployeeModalOpen] = useState(false);
+  const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'attendance'
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -47,18 +45,20 @@ export default function Dashboard() {
         }
       }
 
+      // Fetch attendance for the selected month for the attendance table
       const attendanceSnapshot = await getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`));
       const attendanceData: { [key: string]: any } = {};
       attendanceSnapshot.forEach(doc => {
         attendanceData[doc.id] = doc.data().days;
       });
-
+      
       const processedWorkers = workersToLoad.map(w => {
         const workerWithAttendance = { ...w, days: attendanceData[w.id] || {} };
         return processWorkerData(workerWithAttendance, date.year, date.month);
       });
-
+      
       setWorkers(processedWorkers);
+
     } catch (error) {
       console.error("Error fetching data: ", error);
     } finally {
@@ -96,20 +96,12 @@ export default function Dashboard() {
 
         {isAdmin ? (
           <>
-            <div className="no-print">
-              <KPIs workers={workers} year={date.year} month={date.month} />
-              <Charts workers={workers} year={date.year} month={date.month} />
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
-                  <div className="md:col-span-2">
-                      <LeaveRequestsAdmin onAction={handleDataUpdate} />
-                  </div>
-                  <div>
-                      <EmployeesOnLeave />
-                  </div>
-              </div>
-
+            <div className="no-print mb-6">
               <div className="flex flex-wrap gap-4 justify-center my-6">
+                 <Button onClick={() => setActiveView(activeView === 'analytics' ? 'attendance' : 'analytics')}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  {activeView === 'analytics' ? 'عرض جدول الحضور' : 'عرض لوحة التحكم التحليلية'}
+                </Button>
                 <Button onClick={() => setPayrollModalOpen(true)}>
                   <CircleDollarSign className="mr-2 h-4 w-4" />
                   مسير الرواتب
@@ -120,15 +112,20 @@ export default function Dashboard() {
                 </Button>
               </div>
             </div>
-            <div className="card overflow-hidden shadow-lg no-print">
-                <AttendanceTable
-                  workers={workers}
-                  year={date.year}
-                  month={date.month}
-                  isAdmin={isAdmin}
-                  onDataUpdate={handleDataUpdate}
-                />
-            </div>
+             
+             {activeView === 'analytics' ? (
+                <AdminAnalytics />
+             ) : (
+                <div className="card overflow-hidden shadow-lg no-print">
+                    <AttendanceTable
+                      workers={workers}
+                      year={date.year}
+                      month={date.month}
+                      isAdmin={isAdmin}
+                      onDataUpdate={handleDataUpdate}
+                    />
+                </div>
+             )}
           </>
         ) : (
           <EmployeeDashboard 
