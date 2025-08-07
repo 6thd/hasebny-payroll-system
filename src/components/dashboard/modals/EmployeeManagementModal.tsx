@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Calculator } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import EndOfServiceModal from './EndOfServiceModal';
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -20,8 +21,6 @@ interface EmployeeManagementModalProps {
   onDataUpdate: () => void;
 }
 
-// NOTE: This component only deals with permanent employee data.
-// Monthly variables (commission, advances, penalties) are managed in PayrollModal.
 const initialFormState: Partial<Worker> = {
   id: '', name: '', department: '', jobTitle: '', shift: 'الوردية النهارية', role: 'employee',
   basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0,
@@ -30,11 +29,11 @@ const initialFormState: Partial<Worker> = {
 export default function EmployeeManagementModal({ isOpen, onClose, workers, onDataUpdate }: EmployeeManagementModalProps) {
   const [formData, setFormData] = useState<Partial<Worker>>(initialFormState);
   const [isEditing, setIsEditing] = useState(false);
+  const [eosModalState, setEosModalState] = useState<{ isOpen: boolean; worker: Worker | null }>({ isOpen: false, worker: null });
   const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    // Note: this list does NOT include commission, advances, penalties
     const isNumberField = type === 'number' || ['basicSalary', 'housing', 'workNature', 'transport', 'phone', 'food'].includes(name);
     setFormData(prev => ({ ...prev, [name]: isNumberField ? parseFloat(value) || 0 : value }));
   };
@@ -43,6 +42,15 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     setFormData(worker);
     setIsEditing(true);
   };
+  
+  const openEosModal = (worker: Worker) => {
+    setEosModalState({ isOpen: true, worker: worker });
+  };
+
+  const closeEosModal = () => {
+    setEosModalState({ isOpen: false, worker: null });
+  };
+
 
   const resetForm = () => {
     setFormData(initialFormState);
@@ -62,8 +70,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
       dataToSave.hireDate = new Date().toISOString().split('T')[0];
     }
     
-    // Remove properties that are not part of the employee document schema
-    // or are managed elsewhere.
     const { days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
     
     try {
@@ -79,8 +85,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
   const handleDelete = async (workerId: string) => {
     try {
-      // Note: This only deletes the employee record. Monthly salary records will remain
-      // but will be orphaned. For a production app, a cleanup function would be needed.
       await deleteDoc(doc(db, 'employees', workerId));
       toast({ title: 'تم حذف الموظف' });
       onDataUpdate();
@@ -96,6 +100,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
   ];
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetForm(); onClose(); }}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader><DialogTitle>إدارة الموظفين</DialogTitle></DialogHeader>
@@ -110,6 +115,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                     <p className="text-sm text-muted-foreground">{w.jobTitle || 'N/A'}</p>
                   </div>
                   <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEosModal(w)} title="حساب نهاية الخدمة"><Calculator className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -161,5 +167,14 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
         </div>
       </DialogContent>
     </Dialog>
+    
+    {eosModalState.isOpen && eosModalState.worker && (
+        <EndOfServiceModal 
+            isOpen={eosModalState.isOpen}
+            onClose={closeEosModal}
+            worker={eosModalState.worker}
+        />
+    )}
+    </>
   );
 }

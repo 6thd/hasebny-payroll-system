@@ -19,6 +19,8 @@ export interface Worker {
   department?: string;
   jobTitle?: string;
   shift?: string;
+  hireDate?: string; // ISO 8601 format (YYYY-MM-DD)
+  employeeId?: string;
   basicSalary: number;
   housing: number;
   workNature: number;
@@ -107,4 +109,12 @@ export interface LeaveRequest {
   createdAt: Timestamp;
   reviewedBy?: string; // Admin/Manager UID
   reviewedAt?: Timestamp;
+}
+
+export interface EndOfServiceResult {
+    serviceDurationYears: number;
+    baseGratuity: number;
+    finalGratuity: number;
+    leaveBalanceValue: number;
+    totalAmount: number;
 }
