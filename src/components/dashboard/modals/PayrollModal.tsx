@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,9 @@ import { calculatePayroll, MONTHS } from '@/lib/utils';
 import PredictiveAnalysis from '../PredictiveAnalysis';
 import { exportToExcel } from '@/lib/xlsx';
 import { Printer, FileDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import LoadingSpinner from '../../LoadingSpinner';
 
 interface PayrollModalProps {
   isOpen: boolean;
@@ -26,7 +29,10 @@ interface PayrollModalProps {
 export default function PayrollModal({ isOpen, onClose, workers: initialWorkers, year, month, onDataUpdate }: PayrollModalProps) {
   const [workers, setWorkers] = useState(initialWorkers);
   const [payrolls, setPayrolls] = useState<{ [key: string]: PayrollData }>({});
+  const [isPrinting, setIsPrinting] = useState(false);
   const { toast } = useToast();
+  const tableRef = useRef<HTMLTableElement>(null);
+
 
   const recomputePayrolls = (currentWorkers: Worker[]) => {
     const newPayrolls: { [key: string]: PayrollData } = {};
@@ -60,8 +66,31 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportToPdf = async () => {
+    if (!tableRef.current) return;
+    setIsPrinting(true);
+  
+    // Temporarily apply a class for printing to ensure styles are correct
+    document.body.classList.add('printing-pdf');
+
+    const canvas = await html2canvas(tableRef.current, {
+      scale: 2, // Increase scale for better resolution
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+    
+    document.body.classList.remove('printing-pdf');
+  
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'px',
+      format: [canvas.width, canvas.height]
+    });
+  
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    pdf.save(`مسير_رواتب_${MONTHS[month]}_${year}.pdf`);
+    setIsPrinting(false);
   };
   
   const financialFields: { key: keyof Worker, label: string }[] = [
@@ -83,14 +112,14 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-grow">
-          <Table>
+          <Table ref={tableRef}>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
                 <TableHead colSpan={financialFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
                 <TableHead colSpan={deductionFields.length + 1} className="text-center text-red-600">الاستقطاعات</TableHead>
                 <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
-                <TableHead rowSpan={2}>إجراءات</TableHead>
+                <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
               </TableRow>
               <TableRow>
                 {financialFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
@@ -116,7 +145,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                   ))}
                   <TableCell className="text-red-600">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
                   <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
-                  <TableCell className="space-x-2 rtl:space-x-reverse">
+                  <TableCell className="space-x-2 rtl:space-x-reverse no-print">
                     <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>
                     {payrolls[worker.id] && <PredictiveAnalysis worker={worker} payroll={payrolls[worker.id]} />}
                   </TableCell>
@@ -126,13 +155,13 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
           </Table>
         </ScrollArea>
         <DialogFooter className="no-print gap-2">
-            <Button onClick={() => exportToExcel(workers, year, month)} variant="outline">
+            <Button onClick={() => exportToExcel(workers, year, month)} variant="outline" disabled={isPrinting}>
                 <FileDown className="ml-2 h-4 w-4" />
                 تصدير Excel
             </Button>
-            <Button onClick={handlePrint} variant="outline">
-                <Printer className="ml-2 h-4 w-4" />
-                طباعة التقرير
+            <Button onClick={handleExportToPdf} variant="outline" disabled={isPrinting}>
+                {isPrinting ? <LoadingSpinner /> : <Printer className="ml-2 h-4 w-4" />}
+                {isPrinting ? 'جارٍ التصدير...' : 'تصدير PDF'}
             </Button>
           <DialogClose asChild>
             <Button type="button" variant="secondary">إغلاق</Button>

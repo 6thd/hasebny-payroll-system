@@ -69,6 +69,33 @@
   }
 }
 
+.printing-pdf {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+.printing-pdf table {
+  background-color: white !important;
+  color: black !important;
+}
+
+.printing-pdf .bg-background {
+  background-color: white !important;
+}
+
+.printing-pdf .text-green-600 {
+  color: #16a34a !important;
+}
+
+.printing-pdf .text-red-600 {
+  color: #dc2626 !important;
+}
+
+.printing-pdf .text-primary {
+  color: hsl(var(--primary)) !important;
+}
+
+
 @media print {
   .no-print {
     display: none !important;
