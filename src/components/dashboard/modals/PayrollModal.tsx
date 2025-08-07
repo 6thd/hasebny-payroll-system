@@ -70,11 +70,10 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
     if (!tableRef.current) return;
     setIsPrinting(true);
   
-    // Temporarily apply a class for printing to ensure styles are correct
     document.body.classList.add('printing-pdf');
 
     const canvas = await html2canvas(tableRef.current, {
-      scale: 2, // Increase scale for better resolution
+      scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
     });
@@ -105,56 +104,58 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl h-[90vh] flex flex-col printable">
-        <DialogHeader className="no-print">
+        <DialogHeader className="no-print flex-shrink-0">
           <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
             يمكنك تعديل القيم المالية للموظفين هنا. سيتم إعادة حساب القيم المشتقة تلقائياً.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-grow">
-          <Table ref={tableRef}>
-            <TableHeader className="sticky top-0 bg-background z-10">
-              <TableRow>
-                <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
-                <TableHead colSpan={financialFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
-                <TableHead colSpan={deductionFields.length + 1} className="text-center text-red-600">الاستقطاعات</TableHead>
-                <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
-                <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
-              </TableRow>
-              <TableRow>
-                {financialFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
-                <TableHead>إضافي</TableHead>
-                {deductionFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
-                <TableHead>غياب</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {workers.map(worker => (
-                <TableRow key={worker.id}>
-                  <TableCell className="font-semibold sticky rtl:right-0 ltr:left-0 bg-background z-10">{worker.name}</TableCell>
-                  {financialFields.map(f => (
-                    <TableCell key={f.key}>
-                      <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24" />
-                    </TableCell>
-                  ))}
-                  <TableCell className="text-green-600">{payrolls[worker.id]?.overtimePay.toFixed(2)}</TableCell>
-                  {deductionFields.map(f => (
-                    <TableCell key={f.key}>
-                      <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24" />
-                    </TableCell>
-                  ))}
-                  <TableCell className="text-red-600">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
-                  <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
-                  <TableCell className="space-x-2 rtl:space-x-reverse no-print">
-                    <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>
-                    {payrolls[worker.id] && <PredictiveAnalysis worker={worker} payroll={payrolls[worker.id]} />}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-        <DialogFooter className="no-print gap-2">
+        <div className="flex-grow min-h-0">
+            <ScrollArea className="h-full">
+                <Table ref={tableRef}>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                        <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
+                        <TableHead colSpan={financialFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
+                        <TableHead colSpan={deductionFields.length + 1} className="text-center text-red-600">الاستقطاعات</TableHead>
+                        <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
+                        <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
+                    </TableRow>
+                    <TableRow>
+                        {financialFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
+                        <TableHead>إضافي</TableHead>
+                        {deductionFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
+                        <TableHead>غياب</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {workers.map(worker => (
+                        <TableRow key={worker.id}>
+                        <TableCell className="font-semibold sticky rtl:right-0 ltr:left-0 bg-background z-10">{worker.name}</TableCell>
+                        {financialFields.map(f => (
+                            <TableCell key={f.key}>
+                            <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
+                            </TableCell>
+                        ))}
+                        <TableCell className="text-green-600">{payrolls[worker.id]?.overtimePay.toFixed(2)}</TableCell>
+                        {deductionFields.map(f => (
+                            <TableCell key={f.key}>
+                            <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
+                            </TableCell>
+                        ))}
+                        <TableCell className="text-red-600">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
+                        <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
+                        <TableCell className="space-x-2 rtl:space-x-reverse no-print">
+                            <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>
+                            {payrolls[worker.id] && <PredictiveAnalysis worker={worker} payroll={payrolls[worker.id]} />}
+                        </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+        </div>
+        <DialogFooter className="no-print gap-2 flex-shrink-0">
             <Button onClick={() => exportToExcel(workers, year, month)} variant="outline" disabled={isPrinting}>
                 <FileDown className="ml-2 h-4 w-4" />
                 تصدير Excel
@@ -163,9 +164,9 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 {isPrinting ? <LoadingSpinner /> : <Printer className="ml-2 h-4 w-4" />}
                 {isPrinting ? 'جارٍ التصدير...' : 'تصدير PDF'}
             </Button>
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">إغلاق</Button>
-          </DialogClose>
+            <DialogClose asChild>
+                <Button type="button" variant="secondary">إغلاق</Button>
+            </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
