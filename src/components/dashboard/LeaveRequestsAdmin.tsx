@@ -10,7 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
-import { Check, X } from 'lucide-react';
+import { Check, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface LeaveRequest {
     id: string;
@@ -32,6 +37,10 @@ const leaveTypeMap: { [key: string]: string } = {
 export default function LeaveRequestsAdmin() {
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+    const [newStartDate, setNewStartDate] = useState<Date | undefined>();
+    const [newEndDate, setNewEndDate] = useState<Date | undefined>();
     const { toast } = useToast();
 
     const fetchRequests = useCallback(async () => {
@@ -53,14 +62,24 @@ export default function LeaveRequestsAdmin() {
         fetchRequests();
     }, [fetchRequests]);
 
-    const handleApprove = async (id: string) => {
-        const result = await approveLeaveRequest(id);
+    const handleOpenEditModal = (req: LeaveRequest) => {
+        setSelectedRequest(req);
+        setNewStartDate(req.startDate.toDate());
+        setNewEndDate(req.endDate.toDate());
+        setEditModalOpen(true);
+    };
+
+    const handleConfirmApproval = async () => {
+        if (!selectedRequest) return;
+        const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
             fetchRequests();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
+        setEditModalOpen(false);
+        setSelectedRequest(null);
     };
 
     const handleReject = async (id: string) => {
@@ -74,51 +93,106 @@ export default function LeaveRequestsAdmin() {
     };
 
     return (
-        <Card className="shadow-md no-print">
-            <CardHeader>
-                <CardTitle>طلبات الإجازة المعلقة</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {loading ? (
-                    <div className="flex justify-center items-center h-24">
-                        <LoadingSpinner />
-                    </div>
-                ) : requests.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة معلقة حاليًا.</p>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>الموظف</TableHead>
-                                <TableHead>نوع الإجازة</TableHead>
-                                <TableHead>من تاريخ</TableHead>
-                                <TableHead>إلى تاريخ</TableHead>
-                                <TableHead>ملاحظات</TableHead>
-                                <TableHead className="text-center">إجراءات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {requests.map(req => (
-                                <TableRow key={req.id}>
-                                    <TableCell className="font-medium">{req.employeeName}</TableCell>
-                                    <TableCell><Badge variant="secondary">{leaveTypeMap[req.leaveType] || req.leaveType}</Badge></TableCell>
-                                    <TableCell>{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                    <TableCell>{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                    <TableCell>{req.notes || '-'}</TableCell>
-                                    <TableCell className="text-center space-x-2 rtl:space-x-reverse">
-                                        <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleApprove(req.id)}>
-                                            <Check className="h-5 w-5" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)}>
-                                            <X className="h-5 w-5" />
-                                        </Button>
-                                    </TableCell>
+        <>
+            <Card className="shadow-md no-print">
+                <CardHeader>
+                    <CardTitle>طلبات الإجازة المعلقة</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {loading ? (
+                        <div className="flex justify-center items-center h-24">
+                            <LoadingSpinner />
+                        </div>
+                    ) : requests.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة معلقة حاليًا.</p>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>الموظف</TableHead>
+                                    <TableHead>نوع الإجازة</TableHead>
+                                    <TableHead>من تاريخ</TableHead>
+                                    <TableHead>إلى تاريخ</TableHead>
+                                    <TableHead>ملاحظات</TableHead>
+                                    <TableHead className="text-center">إجراءات</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-            </CardContent>
-        </Card>
+                            </TableHeader>
+                            <TableBody>
+                                {requests.map(req => (
+                                    <TableRow key={req.id}>
+                                        <TableCell className="font-medium">{req.employeeName}</TableCell>
+                                        <TableCell><Badge variant="secondary">{leaveTypeMap[req.leaveType] || req.leaveType}</Badge></TableCell>
+                                        <TableCell>{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                        <TableCell>{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                        <TableCell>{req.notes || '-'}</TableCell>
+                                        <TableCell className="text-center space-x-2 rtl:space-x-reverse">
+                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleOpenEditModal(req)}>
+                                                <Check className="h-5 w-5" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)}>
+                                                <X className="h-5 w-5" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>الموافقة على الإجازة مع تعديل</DialogTitle>
+                    </DialogHeader>
+                    {selectedRequest && (
+                        <div className="space-y-4 py-4">
+                            <p>الموظف: <span className="font-semibold">{selectedRequest.employeeName}</span></p>
+                            <div className="flex flex-col space-y-2">
+                                <label>تاريخ البدء</label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn("w-full justify-start text-left font-normal", !newStartDate && "text-muted-foreground")}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {newStartDate ? format(newStartDate, "PPP") : <span>اختر تاريخًا</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={newStartDate} onSelect={setNewStartDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                             <div className="flex flex-col space-y-2">
+                                <label>تاريخ الانتهاء</label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn("w-full justify-start text-left font-normal", !newEndDate && "text-muted-foreground")}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {newEndDate ? format(newEndDate, "PPP") : <span>اختر تاريخًا</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={newEndDate} onSelect={setNewEndDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="ghost">إلغاء</Button>
+                        </DialogClose>
+                        <Button onClick={handleConfirmApproval}>تأكيد الموافقة</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

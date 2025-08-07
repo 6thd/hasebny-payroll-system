@@ -65,7 +65,7 @@ async function createNotification(employeeId: string, message: string) {
 
 const ANNUAL_LEAVE_BALANCE = 30;
 
-export async function approveLeaveRequest(requestId: string) {
+export async function approveLeaveRequest(requestId: string, newStartDate?: Date, newEndDate?: Date) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
         const requestSnap = await getDoc(requestRef);
@@ -75,9 +75,14 @@ export async function approveLeaveRequest(requestId: string) {
         }
         
         const leaveData = requestSnap.data();
-        const { employeeId, startDate, endDate, leaveType } = leaveData;
-        const start = startDate.toDate();
-        const end = endDate.toDate();
+        const { employeeId, leaveType } = leaveData;
+        
+        const start = newStartDate || leaveData.startDate.toDate();
+        const end = newEndDate || leaveData.endDate.toDate();
+
+        if (end < start) {
+            return { success: false, error: 'تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء.' };
+        }
 
         // --- Start of Leave Balance Check ---
         if (leaveType === 'annual') {
@@ -154,10 +159,15 @@ export async function approveLeaveRequest(requestId: string) {
         }
 
         // Update leave request status
-        batch.update(requestRef, {
+        const finalUpdateData: any = {
             status: 'approved',
             reviewedAt: serverTimestamp(),
-        });
+        };
+
+        if (newStartDate) finalUpdateData.startDate = Timestamp.fromDate(newStartDate);
+        if (newEndDate) finalUpdateData.endDate = Timestamp.fromDate(newEndDate);
+
+        batch.update(requestRef, finalUpdateData);
         
         await batch.commit();
         
