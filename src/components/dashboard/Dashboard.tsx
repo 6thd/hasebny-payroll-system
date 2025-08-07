@@ -40,7 +40,6 @@ export default function Dashboard() {
         const employeesSnapshot = await getDocs(collection(db, 'employees'));
         workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       } else {
-        // For an employee, fetch only their specific and most up-to-date data
         const employeeDocRef = doc(db, 'employees', user.id);
         const employeeDocSnap = await getDoc(employeeDocRef);
         if (employeeDocSnap.exists()) {
