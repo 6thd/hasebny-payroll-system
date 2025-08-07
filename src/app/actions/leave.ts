@@ -1,9 +1,13 @@
 'use server';
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import {
+  getFirestore,
+  writeBatch,
+} from 'firebase/firestore';
 
 const leaveRequestSchema = z.object({
   employeeId: z.string(),
@@ -68,13 +72,41 @@ export async function approveLeaveRequest(requestId: string) {
             return { success: false, error: 'لم يتم العثور على الطلب.' };
         }
         
-        await updateDoc(requestRef, {
+        const leaveData = requestSnap.data();
+        const { employeeId, startDate, endDate, leaveType } = leaveData;
+        const start = startDate.toDate();
+        const end = endDate.toDate();
+
+        // Update attendance records
+        const batch = writeBatch(db);
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const year = d.getFullYear();
+            const month = d.getMonth() + 1;
+            const day = d.getDate();
+            const attendanceDocRef = doc(db, `attendance_${year}_${month}`, employeeId);
+
+            // Using set with merge to create or update the attendance document
+            const fieldPath = `days.${day}`;
+            batch.set(attendanceDocRef, {
+                days: {
+                    [day]: {
+                        status: leaveType === 'sick' ? 'sick_leave' : 'annual_leave'
+                    }
+                }
+            }, { merge: true });
+        }
+
+        // Update leave request status
+        batch.update(requestRef, {
             status: 'approved',
             reviewedAt: serverTimestamp(),
         });
         
+        await batch.commit();
+        
         await createNotification(
-            requestSnap.data().employeeId, 
+            employeeId, 
             'تمت الموافقة على طلب الإجازة الخاص بك.'
         );
 

@@ -38,9 +38,9 @@ export default function AttendanceTable({ workers, year, month, isAdmin, onDataU
     let cellClass = '';
     if (dayData) {
       switch (dayData.status) {
-        case 'sick_leave': cellClass = 'bg-yellow-100 dark:bg-yellow-900'; break;
-        case 'annual_leave': cellClass = 'bg-blue-100 dark:bg-blue-900'; break;
-        case 'absent': cellClass = 'bg-red-100 dark:bg-red-900'; break;
+        case 'sick_leave': cellClass = 'bg-yellow-200 dark:bg-yellow-900'; break;
+        case 'annual_leave': cellClass = 'bg-blue-200 dark:bg-blue-900'; break;
+        case 'absent': cellClass = 'bg-red-200 dark:bg-red-900'; break;
         default: break;
       }
     }
