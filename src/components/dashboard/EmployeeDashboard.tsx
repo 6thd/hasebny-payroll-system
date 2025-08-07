@@ -16,6 +16,7 @@ interface EmployeeDashboardProps {
   year: number;
   month: number;
   onDateChange: (newDate: { year: number; month: number }) => void;
+  onDataUpdate: () => void;
 }
 
 const StatCard = ({ title, value }: { title: string; value: string | number }) => (
@@ -30,7 +31,7 @@ const StatCard = ({ title, value }: { title: string; value: string | number }) =
 );
 
 
-export default function EmployeeDashboard({ employee, year, month, onDateChange }: EmployeeDashboardProps) {
+export default function EmployeeDashboard({ employee, year, month, onDateChange, onDataUpdate }: EmployeeDashboardProps) {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   
   if (!employee) {
@@ -40,6 +41,12 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const { netSalary } = calculatePayroll(employee, year, month);
   const CURRENCY = 'ريال';
+  
+  const handleLeaveSubmitted = () => {
+    setIsLeaveModalOpen(false);
+    onDataUpdate(); 
+  };
+
 
   return (
     <div className="space-y-6">
@@ -90,7 +97,7 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
                 <DialogHeader>
                 <DialogTitle>تقديم طلب إجازة</DialogTitle>
                 </DialogHeader>
-                <LeaveRequestForm onSubmitted={() => setIsLeaveModalOpen(false)} />
+                <LeaveRequestForm onSubmitted={handleLeaveSubmitted} />
             </DialogContent>
             </Dialog>
         </CardContent>
@@ -106,7 +113,7 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange 
             year={year}
             month={month}
             isAdmin={false}
-            onDataUpdate={() => {}}
+            onDataUpdate={onDataUpdate}
           />
         </CardContent>
       </Card>

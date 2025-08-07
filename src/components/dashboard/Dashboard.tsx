@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import type { Worker } from '@/types';
@@ -39,9 +39,12 @@ export default function Dashboard() {
         const employeesSnapshot = await getDocs(collection(db, 'employees'));
         workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       } else {
-        // For an employee, we fetch only their data.
-        // The user object from useAuth should already contain this.
-        workersToLoad = [user as Worker];
+        // For an employee, fetch only their specific and most up-to-date data
+        const employeeDocRef = doc(db, 'employees', user.id);
+        const employeeDocSnap = await getDoc(employeeDocRef);
+        if (employeeDocSnap.exists()) {
+            workersToLoad = [{ id: employeeDocSnap.id, ...employeeDocSnap.data() } as Worker];
+        }
       }
 
       const attendanceSnapshot = await getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`));
@@ -142,6 +145,7 @@ export default function Dashboard() {
             year={date.year}
             month={date.month}
             onDateChange={handleDateChange}
+            onDataUpdate={handleDataUpdate}
           />
         )}
       </div>
