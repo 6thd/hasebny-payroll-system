@@ -1,6 +1,6 @@
 'use server';
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
@@ -63,6 +63,8 @@ async function createNotification(employeeId: string, message: string) {
   }
 }
 
+const ANNUAL_LEAVE_BALANCE = 30;
+
 export async function approveLeaveRequest(requestId: string) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
@@ -76,6 +78,60 @@ export async function approveLeaveRequest(requestId: string) {
         const { employeeId, startDate, endDate, leaveType } = leaveData;
         const start = startDate.toDate();
         const end = endDate.toDate();
+
+        // --- Start of Leave Balance Check ---
+        if (leaveType === 'annual') {
+            const employeeRef = doc(db, 'employees', employeeId);
+            const employeeSnap = await getDoc(employeeRef);
+            if (!employeeSnap.exists()) {
+                return { success: false, error: 'لم يتم العثور على بيانات الموظف.' };
+            }
+            const employeeData = employeeSnap.data();
+            const hireDate = new Date(employeeData.hireDate);
+            const currentDate = new Date();
+            
+            let serviceYearStart = new Date(currentDate.getFullYear(), hireDate.getMonth(), hireDate.getDate());
+            if (currentDate < serviceYearStart) {
+                serviceYearStart.setFullYear(serviceYearStart.getFullYear() - 1);
+            }
+            const serviceYearEnd = new Date(serviceYearStart.getFullYear() + 1, serviceYearStart.getMonth(), serviceYearStart.getDate());
+
+            const q = query(
+                collection(db, 'leaveRequests'),
+                where('employeeId', '==', employeeId),
+                where('status', '==', 'approved'),
+                where('leaveType', '==', 'annual'),
+                where('startDate', '>=', serviceYearStart),
+                where('startDate', '<', serviceYearEnd)
+            );
+
+            const approvedLeavesSnap = await getDocs(q);
+            let daysTaken = 0;
+            approvedLeavesSnap.forEach(doc => {
+                const req = doc.data();
+                const reqStart = req.startDate.toDate();
+                const reqEnd = req.endDate.toDate();
+                daysTaken += (reqEnd.getTime() - reqStart.getTime()) / (1000 * 3600 * 24) + 1;
+            });
+
+            const newLeaveDuration = (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1;
+
+            if (daysTaken + newLeaveDuration > ANNUAL_LEAVE_BALANCE) {
+                 await updateDoc(requestRef, {
+                    status: 'rejected',
+                    reviewedAt: serverTimestamp(),
+                    notes: 'تم الرفض تلقائيًا لعدم وجود رصيد إجازات كافٍ.'
+                });
+                await createNotification(
+                    employeeId,
+                    'تم رفض طلب الإجازة الخاص بك لعدم كفاية الرصيد.'
+                );
+                revalidatePath('/');
+                return { success: false, error: 'رصيد الموظف غير كافٍ. تم رفض الطلب تلقائيًا.' };
+            }
+        }
+        // --- End of Leave Balance Check ---
+
 
         // Update attendance records
         const batch = writeBatch(db);
