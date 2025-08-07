@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
@@ -26,6 +26,7 @@ interface LeaveRequest {
     endDate: Timestamp;
     notes?: string;
     status: 'pending' | 'approved' | 'rejected';
+    createdAt: Timestamp;
 }
 
 const leaveTypeMap: { [key: string]: string } = {
@@ -46,9 +47,16 @@ export default function LeaveRequestsAdmin() {
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'leaveRequests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+            // Fetch all leave requests and filter/sort client-side to avoid composite indexes.
+            const q = query(collection(db, 'leaveRequests'));
             const querySnapshot = await getDocs(q);
-            const pendingRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+
+            const allRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+            
+            const pendingRequests = allRequests
+                .filter(req => req.status === 'pending')
+                .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()); // Sort descending by creation time
+
             setRequests(pendingRequests);
         } catch (error) {
             console.error("Error fetching leave requests:", error);
@@ -71,6 +79,7 @@ export default function LeaveRequestsAdmin() {
 
     const handleConfirmApproval = async () => {
         if (!selectedRequest) return;
+        setLoading(true);
         const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
@@ -80,9 +89,11 @@ export default function LeaveRequestsAdmin() {
         }
         setEditModalOpen(false);
         setSelectedRequest(null);
+        setLoading(false);
     };
 
     const handleReject = async (id: string) => {
+        setLoading(true);
         const result = await rejectLeaveRequest(id);
         if (result.success) {
             toast({ title: "تم الرفض", description: "تم رفض طلب الإجازة." });
@@ -90,6 +101,7 @@ export default function LeaveRequestsAdmin() {
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
+        setLoading(false);
     };
 
     return (
@@ -127,10 +139,10 @@ export default function LeaveRequestsAdmin() {
                                         <TableCell className="whitespace-nowrap">{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
                                         <TableCell>{req.notes || '-'}</TableCell>
                                         <TableCell className="text-center space-x-2 rtl:space-x-reverse">
-                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleOpenEditModal(req)}>
+                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleOpenEditModal(req)} disabled={loading}>
                                                 <Check className="h-5 w-5" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)}>
+                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)} disabled={loading}>
                                                 <X className="h-5 w-5" />
                                             </Button>
                                         </TableCell>
@@ -189,9 +201,12 @@ export default function LeaveRequestsAdmin() {
                     )}
                     <DialogFooter>
                         <DialogClose asChild>
-                            <Button variant="ghost">إلغاء</Button>
+                            <Button variant="ghost" disabled={loading}>إلغاء</Button>
                         </DialogClose>
-                        <Button onClick={handleConfirmApproval}>تأكيد الموافقة</Button>
+                        <Button onClick={handleConfirmApproval} disabled={loading}>
+                           {loading && <LoadingSpinner />}
+                           {loading ? 'جارٍ الحفظ...' : 'تأكيد الموافقة'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
