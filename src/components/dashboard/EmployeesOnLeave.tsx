@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,10 +61,13 @@ export default function EmployeesOnLeave() {
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            const todayTimestamp = Timestamp.fromDate(today);
 
             const q = query(
-                collection(db, 'leaveRequests'), 
-                where('status', '==', 'approved')
+                collection(db, 'leaveRequests'),
+                where('status', '==', 'approved'),
+                where('endDate', '>=', todayTimestamp),
+                orderBy('endDate', 'asc') 
             );
 
             const querySnapshot = await getDocs(q);
@@ -76,19 +79,18 @@ export default function EmployeesOnLeave() {
 
             allApprovedLeaves.forEach(leave => {
                 const startDate = leave.startDate.toDate();
-                const endDate = leave.endDate.toDate();
-
-                if (endDate < today) return; // Skip past leaves
-
-                if (startDate <= today && endDate >= today) {
+                if (startDate <= today) {
                     active.push(leave);
-                } else if (startDate > today) {
+                } else {
                     upcoming.push(leave);
                 }
             });
 
-            setOnLeave(active.sort((a,b) => a.endDate.toMillis() - b.endDate.toMillis()));
-            setUpcomingLeaves(upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis()));
+            // Sort upcoming leaves by start date separately as we order by end date in query
+            upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
+
+            setOnLeave(active);
+            setUpcomingLeaves(upcoming);
 
         } catch (error) {
             console.error("Error fetching employees on leave:", error);
