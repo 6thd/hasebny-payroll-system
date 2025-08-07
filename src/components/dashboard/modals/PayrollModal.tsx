@@ -76,7 +76,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl h-[90vh] flex flex-col printable">
-        <DialogHeader>
+        <DialogHeader className="no-print">
           <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
             يمكنك تعديل القيم المالية للموظفين هنا. سيتم إعادة حساب القيم المشتقة تلقائياً.

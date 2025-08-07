@@ -96,29 +96,31 @@ export default function Dashboard() {
 
         {isAdmin ? (
           <>
-            <KPIs workers={workers} year={date.year} month={date.month} />
-            <Charts workers={workers} year={date.year} month={date.month} />
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
-                <div className="md:col-span-2">
-                    <LeaveRequestsAdmin />
-                </div>
-                <div>
-                    <EmployeesOnLeave />
-                </div>
-            </div>
+            <div className="no-print">
+              <KPIs workers={workers} year={date.year} month={date.month} />
+              <Charts workers={workers} year={date.year} month={date.month} />
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
+                  <div className="md:col-span-2">
+                      <LeaveRequestsAdmin />
+                  </div>
+                  <div>
+                      <EmployeesOnLeave />
+                  </div>
+              </div>
 
-            <div className="flex flex-wrap gap-4 justify-center my-6 no-print">
-              <Button onClick={() => setPayrollModalOpen(true)}>
-                <CircleDollarSign className="ml-2 h-4 w-4" />
-                مسير الرواتب
-              </Button>
-              <Button onClick={() => setEmployeeModalOpen(true)}>
-                <Users className="ml-2 h-4 w-4" />
-                إدارة الموظفين
-              </Button>
+              <div className="flex flex-wrap gap-4 justify-center my-6">
+                <Button onClick={() => setPayrollModalOpen(true)}>
+                  <CircleDollarSign className="ml-2 h-4 w-4" />
+                  مسير الرواتب
+                </Button>
+                <Button onClick={() => setEmployeeModalOpen(true)}>
+                  <Users className="ml-2 h-4 w-4" />
+                  إدارة الموظفين
+                </Button>
+              </div>
             </div>
-            <div className="card overflow-hidden shadow-lg">
+            <div className="card overflow-hidden shadow-lg no-print">
               <AttendanceTable
                 workers={workers}
                 year={date.year}
