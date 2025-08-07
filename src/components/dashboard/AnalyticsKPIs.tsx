@@ -10,7 +10,7 @@ import { calculatePayroll } from '@/lib/utils';
 import LoadingSpinner from '../LoadingSpinner';
 
 const KPICard = ({ title, value, icon, isLoading }: { title: string; value: string | number; icon: React.ReactNode, isLoading: boolean }) => (
-  <Card className="shadow-md transition-all hover:shadow-lg hover:scale-105">
+  <Card className="shadow-lg transition-all hover:shadow-xl hover:scale-105 border-l-4 border-primary">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       {icon}
@@ -19,7 +19,7 @@ const KPICard = ({ title, value, icon, isLoading }: { title: string; value: stri
       {isLoading ? (
         <div className="h-8 w-1/2 mt-1 rounded-md animate-pulse bg-muted"></div>
       ) : (
-        <div className="text-2xl font-bold text-primary">{value}</div>
+        <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
       )}
     </CardContent>
   </Card>
@@ -78,29 +78,43 @@ export default function AnalyticsKPIs() {
                     totalPayroll += calculatePayroll(w, year, month).netSalary;
                 });
                 
-
-                // Fetch employees on leave today
                 const todayStart = new Date();
                 todayStart.setHours(0,0,0,0);
-                const qLeaves = query(
-                    collection(db, 'leaveRequests'), 
-                    where('status', '==', 'approved'),
-                    where('startDate', '<=', Timestamp.fromDate(todayStart))
-                );
-                const leavesSnapshot = await getDocs(qLeaves);
-                const onLeaveToday = leavesSnapshot.docs.filter(doc => doc.data().endDate.toDate() >= todayStart).length;
+                
+                const allLeaveReqs = await getDocs(collection(db, 'leaveRequests'));
+                const approvedLeaves = allLeaveReqs.docs
+                    .map(doc => doc.data())
+                    .filter(leave => leave.status === 'approved');
+
+                const onLeaveToday = approvedLeaves.filter(leave => {
+                     const startDate = leave.startDate.toDate();
+                     const endDate = leave.endDate.toDate();
+                     return startDate <= todayStart && endDate >= todayStart;
+                }).length;
+
 
                 // Fetch absent employees today
                 const dayOfMonth = today.getDate();
-                const attendanceTodaySnapshot = await getDocs(collection(db, `attendance_${year}_${month + 1}`));
+                const isFriday = today.getDay() === 5;
                 let absentToday = 0;
-                attendanceTodaySnapshot.forEach(doc => {
-                    const dayData = doc.data().days?.[dayOfMonth];
-                    if (dayData?.status === 'absent') {
-                        absentToday++;
-                    }
-                });
 
+                if (!isFriday) {
+                    const employeeIds = workers.map(w => w.id);
+                    const onLeaveIds = new Set(approvedLeaves
+                        .filter(leave => leave.startDate.toDate() <= todayStart && leave.endDate.toDate() >= todayStart)
+                        .map(leave => leave.employeeId));
+
+                    const attendedIds = new Set<string>();
+                    attendanceSnapshot.forEach(doc => {
+                        const dayData = doc.data().days?.[dayOfMonth];
+                        if (dayData?.status === 'present') {
+                           attendedIds.add(doc.id);
+                        }
+                    });
+
+                    absentToday = employeeIds.filter(id => !attendedIds.has(id) && !onLeaveIds.has(id)).length;
+                }
+                
                 setKpiData({
                     totalEmployees,
                     totalPayroll,
@@ -126,25 +140,25 @@ export default function AnalyticsKPIs() {
             <KPICard 
                 title="إجمالي الموظفين" 
                 value={kpiData.totalEmployees} 
-                icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                icon={<Users className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
             />
             <KPICard 
-                title="إجمالي الرواتب (الشهر الحالي)" 
-                value={`${kpiData.totalPayroll.toFixed(0)} ريال`}
-                icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
+                title="إجمالي الرواتب (الشهر)" 
+                value={`${kpiData.totalPayroll.toLocaleString('ar-SA', { style: 'currency', currency: 'SAR' }).replace('ر.س.', 'ريال')}`}
+                icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
             />
             <KPICard 
                 title="في إجازة اليوم" 
                 value={kpiData.onLeaveToday} 
-                icon={<UserCheck className="h-4 w-4 text-muted-foreground" />}
+                icon={<UserCheck className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
             />
             <KPICard 
                 title="غياب اليوم" 
                 value={kpiData.absentToday} 
-                icon={<UserX className="h-4 w-4 text-muted-foreground" />}
+                icon={<UserX className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
             />
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import type { Worker, MonthlyData } from '@/types';
@@ -9,10 +9,6 @@ import { processWorkerData } from '@/lib/utils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
 import AttendanceTable from './AttendanceTable';
-import { Button } from '../ui/button';
-import { Users, CircleDollarSign, BarChart3 } from 'lucide-react';
-import PayrollModal from './modals/PayrollModal';
-import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import EmployeeDashboard from './EmployeeDashboard';
 import AdminAnalytics from './AdminAnalytics';
 
@@ -24,8 +20,7 @@ export default function Dashboard() {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
   });
-  const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
-  const [isEmployeeModalOpen, setEmployeeModalOpen] = useState(false);
+  
   const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'attendance'
 
   const fetchData = useCallback(async () => {
@@ -44,14 +39,12 @@ export default function Dashboard() {
         }
       }
 
-      // Fetch attendance for the selected month for the attendance table
       const attendanceSnapshot = await getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`));
       const attendanceData: { [key: string]: any } = {};
       attendanceSnapshot.forEach(doc => {
         attendanceData[doc.id] = doc.data().days;
       });
 
-      // Fetch monthly financials for the selected month
       const salaryCollectionName = `salaries_${date.year}_${date.month + 1}`;
       const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
       const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
@@ -91,6 +84,7 @@ export default function Dashboard() {
 
   const handleDataUpdate = () => {
     fetchData();
+    // This custom event helps other components (like charts) know when to refetch data
     window.dispatchEvent(new CustomEvent('data-updated'));
   };
 
@@ -101,48 +95,35 @@ export default function Dashboard() {
   const isAdmin = user.role === 'admin';
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-background min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
       <div className="max-w-full mx-auto">
         <DashboardHeader
           user={user}
           date={date}
           onDateChange={handleDateChange}
           isAdmin={isAdmin}
+          workers={workers}
+          onDataUpdate={handleDataUpdate}
+          activeView={activeView}
+          setActiveView={setActiveView}
         />
 
         {isAdmin ? (
-          <>
-            <div className="no-print mb-6">
-              <div className="flex flex-wrap gap-4 justify-center my-6">
-                 <Button onClick={() => setActiveView(activeView === 'analytics' ? 'attendance' : 'analytics')}>
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  {activeView === 'analytics' ? 'عرض جدول الحضور' : 'عرض لوحة التحكم التحليلية'}
-                </Button>
-                <Button onClick={() => setPayrollModalOpen(true)}>
-                  <CircleDollarSign className="mr-2 h-4 w-4" />
-                  مسير الرواتب
-                </Button>
-                <Button onClick={() => setEmployeeModalOpen(true)}>
-                  <Users className="mr-2 h-4 w-4" />
-                  إدارة الموظفين
-                </Button>
+          <div className="mt-6">
+            {activeView === 'analytics' ? (
+              <AdminAnalytics />
+            ) : (
+              <div className="bg-card p-4 rounded-xl shadow-lg">
+                  <AttendanceTable
+                    workers={workers}
+                    year={date.year}
+                    month={date.month}
+                    isAdmin={isAdmin}
+                    onDataUpdate={handleDataUpdate}
+                  />
               </div>
-            </div>
-             
-             {activeView === 'analytics' ? (
-                <AdminAnalytics />
-             ) : (
-                <div className="card overflow-hidden shadow-lg no-print">
-                    <AttendanceTable
-                      workers={workers}
-                      year={date.year}
-                      month={date.month}
-                      isAdmin={isAdmin}
-                      onDataUpdate={handleDataUpdate}
-                    />
-                </div>
-             )}
-          </>
+            )}
+          </div>
         ) : (
           <EmployeeDashboard 
             employee={workers[0]}
@@ -153,25 +134,6 @@ export default function Dashboard() {
           />
         )}
       </div>
-      
-      {isPayrollModalOpen &&
-        <PayrollModal
-          isOpen={isPayrollModalOpen}
-          onClose={() => setPayrollModalOpen(false)}
-          workers={workers}
-          year={date.year}
-          month={date.month}
-        />
-      }
-
-      {isEmployeeModalOpen &&
-        <EmployeeManagementModal
-          isOpen={isEmployeeModalOpen}
-          onClose={() => setEmployeeModalOpen(false)}
-          workers={workers}
-          onDataUpdate={handleDataUpdate}
-        />
-      }
     </div>
   );
 }

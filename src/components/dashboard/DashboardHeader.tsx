@@ -1,23 +1,33 @@
 "use client";
 
+import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { AppUser } from '@/types';
+import { AppUser, Worker } from '@/types';
 import { MONTHS } from '@/lib/utils';
-import { LogOut } from 'lucide-react';
+import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import PayrollModal from './modals/PayrollModal';
+import EmployeeManagementModal from './modals/EmployeeManagementModal';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 
 interface DashboardHeaderProps {
   user: AppUser;
   date: { year: number; month: number };
   onDateChange: (newDate: { year: number; month: number }) => void;
   isAdmin: boolean;
+  workers: Worker[];
+  onDataUpdate: () => void;
+  activeView: string;
+  setActiveView: (view: string) => void;
 }
 
-export default function DashboardHeader({ user, date, onDateChange, isAdmin }: DashboardHeaderProps) {
+export default function DashboardHeader({ user, date, onDateChange, isAdmin, workers, onDataUpdate, activeView, setActiveView }: DashboardHeaderProps) {
   const router = useRouter();
+  const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
+  const [isEmployeeModalOpen, setEmployeeModalOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -27,14 +37,56 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin }: D
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i);
 
   return (
-    <header className="mb-8 no-print">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="text-center sm:text-right">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-700">
-            {isAdmin ? 'نظام الحضور والرواتب' : 'بوابة الموظف'}
-          </h1>
-          {isAdmin && (
-            <div className="flex items-center gap-2 justify-center sm:justify-start mt-2">
+    <>
+      <header className="no-print bg-card shadow-sm rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-center sm:text-right">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-gray-100">
+              {isAdmin ? 'لوحة تحكم المدير' : 'بوابة الموظف'}
+            </h1>
+            <p className="text-sm text-muted-foreground">{isAdmin ? `نظرة عامة لشهر ${MONTHS[date.month]} ${date.year}` : 'مرحباً بعودتك'}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center items-center">
+             {isAdmin && (
+               <div className="flex items-center gap-2">
+                 <Button variant={activeView === 'analytics' ? "default" : "outline"} onClick={() => setActiveView('analytics')}>
+                    <BarChart3 className="ml-2 h-4 w-4" />
+                    لوحة التحكم
+                 </Button>
+                  <Button variant={activeView === 'attendance' ? "default" : "outline"} onClick={() => setActiveView('attendance')}>
+                    <Users className="ml-2 h-4 w-4" />
+                    جدول الحضور
+                 </Button>
+               </div>
+            )}
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  إجراءات
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {isAdmin && (
+                  <>
+                    <DropdownMenuItem onClick={() => setPayrollModalOpen(true)}>
+                      <CircleDollarSign className="ml-2 h-4 w-4" />
+                      مسير الرواتب
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEmployeeModalOpen(true)}>
+                      <Users className="ml-2 h-4 w-4" />
+                      إدارة الموظفين
+                    </DropdownMenuItem>
+                  </>
+                )}
+                 <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="ml-2 h-4 w-4" />
+                    تسجيل الخروج
+                 </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+             <div className="flex items-center gap-2">
               <Select
                 value={String(date.month)}
                 onValueChange={(value) => onDateChange({ ...date, month: Number(value) })}
@@ -62,18 +114,31 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin }: D
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 justify-center items-center">
-          <div className="text-sm font-semibold text-gray-600 bg-gray-200 px-3 py-1 rounded-full">
-            مرحباً, {user.name || user.email}
+            <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+              {user.name || user.email}
+            </div>
           </div>
-          <Button onClick={handleLogout} variant="destructive" size="sm">
-            <LogOut className="ml-2 h-4 w-4" />
-            خروج
-          </Button>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {isPayrollModalOpen &&
+        <PayrollModal
+          isOpen={isPayrollModalOpen}
+          onClose={() => setPayrollModalOpen(false)}
+          workers={workers}
+          year={date.year}
+          month={date.month}
+        />
+      }
+
+      {isEmployeeModalOpen &&
+        <EmployeeManagementModal
+          isOpen={isEmployeeModalOpen}
+          onClose={() => setEmployeeModalOpen(false)}
+          workers={workers}
+          onDataUpdate={onDataUpdate}
+        />
+      }
+    </>
   );
 }

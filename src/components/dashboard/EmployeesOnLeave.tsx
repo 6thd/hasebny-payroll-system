@@ -19,10 +19,10 @@ interface LeaveRequest {
     status: 'pending' | 'approved' | 'rejected';
 }
 
-const leaveTypeMap: { [key: string]: string } = {
-    annual: 'سنوية',
-    sick: 'مرضية',
-    emergency: 'طارئة',
+const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
+    annual: { label: 'سنوية', variant: 'secondary' },
+    sick: { label: 'مرضية', variant: 'default' },
+    emergency: { label: 'طارئة', variant: 'destructive' },
 };
 
 const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveRequest[], icon: React.ReactNode }) => (
@@ -38,8 +38,8 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
                 {leaves.map(leave => (
                     <li key={leave.id} className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex justify-between items-center">
-                            <p className="font-semibold">{leave.employeeName}</p>
-                            <Badge variant="secondary">{leaveTypeMap[leave.leaveType] || leave.leaveType}</Badge>
+                            <p className="font-semibold text-foreground">{leave.employeeName}</p>
+                            <Badge variant={leaveTypeMap[leave.leaveType]?.variant || 'default'}>{leaveTypeMap[leave.leaveType]?.label || leave.leaveType}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                             من {leave.startDate.toDate().toLocaleDateString('ar-EG')} إلى {leave.endDate.toDate().toLocaleDateString('ar-EG')}
@@ -105,19 +105,18 @@ export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
     }, [toast]);
 
     useEffect(() => {
-        fetchOnLeaveEmployees();
-        // A simple way to trigger re-fetch when actions happen in other components.
         const handleDataUpdate = () => fetchOnLeaveEmployees();
+        fetchOnLeaveEmployees();
         window.addEventListener('data-updated', handleDataUpdate);
         return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, [fetchOnLeaveEmployees]);
 
     return (
-        <Card className="shadow-md no-print h-full">
+        <Card className="shadow-lg no-print h-full">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
                     <UserCheck />
-                    حالة الإجازات الحالية
+                    حالة الإجازات المعتمدة
                 </CardTitle>
             </CardHeader>
             <CardContent>

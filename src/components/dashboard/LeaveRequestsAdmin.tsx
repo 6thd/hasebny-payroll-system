@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
@@ -29,11 +29,12 @@ interface LeaveRequest {
     createdAt: Timestamp;
 }
 
-const leaveTypeMap: { [key: string]: string } = {
-    annual: 'سنوية',
-    sick: 'مرضية',
-    emergency: 'طارئة',
+const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
+    annual: { label: 'سنوية', variant: 'secondary' },
+    sick: { label: 'مرضية', variant: 'default' },
+    emergency: { label: 'طارئة', variant: 'destructive' },
 };
+
 
 interface LeaveRequestsAdminProps {
     onAction?: () => void;
@@ -53,7 +54,6 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch all requests and filter/sort client-side to avoid complex indexes
             const q = query(collection(db, 'leaveRequests'));
             const querySnapshot = await getDocs(q);
 
@@ -74,9 +74,8 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
     }, [toast, itemCount]);
 
     useEffect(() => {
-        fetchRequests();
-         // A simple way to trigger re-fetch when actions happen in other components.
         const handleDataUpdate = () => fetchRequests();
+        fetchRequests();
         window.addEventListener('data-updated', handleDataUpdate);
         return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, [fetchRequests]);
@@ -94,8 +93,8 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
-            fetchRequests(); // Re-fetch to update the list
-            onAction?.(); // Trigger global update
+            fetchRequests();
+            onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
         }
@@ -133,9 +132,12 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
 
     return (
         <>
-            <Card className="shadow-md no-print h-full">
+            <Card className="shadow-lg no-print h-full">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Briefcase />أحدث طلبات الإجازة</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-lg"><Briefcase />طلبات الإجازة المعلقة</span>
+                        <Badge variant="destructive">{requests.length}</Badge>
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
@@ -159,18 +161,18 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                 {requests.map(req => (
                                     <TableRow key={req.id}>
                                         <TableCell className="font-medium whitespace-nowrap">{req.employeeName}</TableCell>
-                                        <TableCell><Badge variant="secondary">{leaveTypeMap[req.leaveType] || req.leaveType}</Badge></TableCell>
-                                        <TableCell className="whitespace-nowrap text-xs">
+                                        <TableCell><Badge variant={leaveTypeMap[req.leaveType]?.variant || 'default'}>{leaveTypeMap[req.leaveType]?.label || req.leaveType}</Badge></TableCell>
+                                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                                             {req.startDate.toDate().toLocaleDateString('ar-EG')} - {req.endDate.toDate().toLocaleDateString('ar-EG')}
                                         </TableCell>
                                         <TableCell className="text-center space-x-1 rtl:space-x-reverse">
-                                            <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => handleApproval(req.id)} disabled={!!actionLoading}>
+                                            <Button size="icon" variant="ghost" className="text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-full" onClick={() => handleApproval(req.id)} disabled={!!actionLoading}>
                                                 {actionLoading === req.id ? <LoadingSpinner /> : <Check className="h-5 w-5" />}
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="text-blue-600 hover:text-blue-700" onClick={() => handleOpenEditModal(req)} disabled={!!actionLoading}>
+                                            <Button size="icon" variant="ghost" className="text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-full" onClick={() => handleOpenEditModal(req)} disabled={!!actionLoading}>
                                                 <Edit className="h-5 w-5" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleReject(req.id)} disabled={!!actionLoading}>
+                                            <Button size="icon" variant="ghost" className="text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-full" onClick={() => handleReject(req.id)} disabled={!!actionLoading}>
                                                 {actionLoading === req.id ? <LoadingSpinner /> : <X className="h-5 w-5" />}
                                             </Button>
                                         </TableCell>
@@ -200,7 +202,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                             className={cn("w-full justify-start text-left font-normal", !newStartDate && "text-muted-foreground")}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {newStartDate ? format(newStartDate, "PPP") : <span>اختر تاريخًا</span>}
+                                            {newStartDate ? format(newStartDate, "PPP", { locale: require('date-fns/locale/ar-SA') }) : <span>اختر تاريخًا</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
@@ -217,7 +219,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                             className={cn("w-full justify-start text-left font-normal", !newEndDate && "text-muted-foreground")}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {newEndDate ? format(newEndDate, "PPP") : <span>اختر تاريخًا</span>}
+                                            {newEndDate ? format(newEndDate, "PPP", { locale: require('date-fns/locale/ar-SA') }) : <span>اختر تاريخًا</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
