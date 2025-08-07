@@ -16,6 +16,7 @@ interface LeaveRequest {
     leaveType: string;
     startDate: Timestamp;
     endDate: Timestamp;
+    status: 'pending' | 'approved' | 'rejected';
 }
 
 const leaveTypeMap: { [key: string]: string } = {
@@ -61,31 +62,40 @@ export default function EmployeesOnLeave() {
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const todayTimestamp = Timestamp.fromDate(today);
 
-            // Simplified query to avoid composite index issue
+            // Fetch all leave requests and filter client-side to avoid complex index requirements.
             const q = query(
-                collection(db, 'leaveRequests'),
-                where('status', '==', 'approved'),
-                where('endDate', '>=', todayTimestamp)
+                collection(db, 'leaveRequests')
             );
 
             const querySnapshot = await getDocs(q);
-            const allApprovedLeaves = querySnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest))
-                .sort((a, b) => a.startDate.toMillis() - b.startDate.toMillis()); // Sort manually
+            const allLeaves = querySnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                
+            const approvedLeaves = allLeaves.filter(leave => leave.status === 'approved');
 
             const active: LeaveRequest[] = [];
             const upcoming: LeaveRequest[] = [];
-
-            allApprovedLeaves.forEach(leave => {
+            
+            approvedLeaves.forEach(leave => {
                 const startDate = leave.startDate.toDate();
+                const endDate = leave.endDate.toDate();
+                endDate.setHours(23, 59, 59, 999); // Ensure end of day is included
+
+                if (endDate < today) {
+                    return; // Skip past leaves
+                }
+                
                 if (startDate <= today) {
                     active.push(leave);
                 } else {
                     upcoming.push(leave);
                 }
             });
+            
+            // Sort leaves by start date
+            active.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
+            upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
 
             setOnLeave(active);
             setUpcomingLeaves(upcoming);
