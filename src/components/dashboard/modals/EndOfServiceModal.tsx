@@ -46,9 +46,10 @@ const FormSchema = z.object({
   lastDayOfWork: z.date({
     required_error: "الرجاء تحديد تاريخ آخر يوم عمل.",
   }),
-  reasonForTermination: z.enum(['termination', 'resignation'], {
-    required_error: "الرجاء تحديد سبب إنهاء الخدمة.",
-  }),
+  reasonForTermination: z.enum(
+      ['resignation', 'contract_termination_by_employer_article_77', 'contract_termination_by_employee_article_81', 'force_majeure', 'termination_article_80'],
+      { required_error: "الرجاء تحديد سبب إنهاء الخدمة." }
+  ),
 });
 
 type FormValues = z.infer<typeof FormSchema>;
@@ -140,7 +141,7 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
               name="reasonForTermination"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>سبب إنهاء الخدمة</FormLabel>
+                  <FormLabel>سبب إنهاء العلاقة العمالية</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -148,8 +149,11 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="termination">انتهاء العقد / فصل من العمل</SelectItem>
                       <SelectItem value="resignation">استقالة</SelectItem>
+                      <SelectItem value="contract_termination_by_employer_article_77">فسخ العقد من قبل صاحب العمل (حسب المادة 77)</SelectItem>
+                       <SelectItem value="contract_termination_by_employee_article_81">فسخ العقد من قبل العامل (حسب المادة 81)</SelectItem>
+                      <SelectItem value="termination_article_80">فصل العامل (حسب المادة 80)</SelectItem>
+                      <SelectItem value="force_majeure">قوة قاهرة</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
