@@ -12,10 +12,9 @@ import KPIs from './KPIs';
 import Charts from './Charts';
 import AttendanceTable from './AttendanceTable';
 import { Button } from '../ui/button';
-import { Printer, FileDown, Users, CircleDollarSign } from 'lucide-react';
+import { Users, CircleDollarSign } from 'lucide-react';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
-import { exportToExcel } from '@/lib/xlsx';
 import EmployeeDashboard from './EmployeeDashboard';
 import LeaveRequestsAdmin from './LeaveRequestsAdmin';
 import EmployeesOnLeave from './EmployeesOnLeave';
@@ -40,10 +39,11 @@ export default function Dashboard() {
         const employeesSnapshot = await getDocs(collection(db, 'employees'));
         workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       } else {
-        const employeeDocRef = doc(db, 'employees', user.id);
-        const employeeDocSnap = await getDoc(employeeDocRef);
-        if (employeeDocSnap.exists()) {
-            workersToLoad = [{ id: employeeDocSnap.id, ...employeeDocSnap.data() } as Worker];
+        const q = query(collection(db, "employees"), where("authUid", "==", user.uid));
+        const employeeDocSnap = await getDocs(q);
+        if (!employeeDocSnap.empty) {
+            const userDoc = employeeDocSnap.docs[0];
+            workersToLoad = [{ id: userDoc.id, ...userDoc.data() } as Worker];
         }
       }
 
@@ -76,14 +76,6 @@ export default function Dashboard() {
 
   const handleDataUpdate = () => {
     fetchData();
-  };
-
-  const handlePrint = () => {
-    if (!isPayrollModalOpen) {
-      alert("يرجى فتح مسير الرواتب أولاً لطباعته.");
-      return;
-    }
-    window.print();
   };
 
   if (loading || !user) {
@@ -124,14 +116,6 @@ export default function Dashboard() {
               <Button onClick={() => setEmployeeModalOpen(true)}>
                 <Users className="ml-2 h-4 w-4" />
                 إدارة الموظفين
-              </Button>
-              <Button onClick={() => exportToExcel(workers, date.year, date.month)} variant="outline">
-                <FileDown className="ml-2 h-4 w-4" />
-                تصدير Excel
-              </Button>
-               <Button onClick={handlePrint} variant="outline">
-                <Printer className="ml-2 h-4 w-4" />
-                طباعة التقرير
               </Button>
             </div>
             <div className="card overflow-hidden shadow-lg">

@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Worker, PayrollData } from '@/types';
 import { calculatePayroll, MONTHS } from '@/lib/utils';
 import PredictiveAnalysis from '../PredictiveAnalysis';
+import { exportToExcel } from '@/lib/xlsx';
+import { Printer, FileDown } from 'lucide-react';
 
 interface PayrollModalProps {
   isOpen: boolean;
@@ -56,6 +58,10 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
     } catch (error) {
       toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
   
   const financialFields: { key: keyof Worker, label: string }[] = [
@@ -119,7 +125,15 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
             </TableBody>
           </Table>
         </ScrollArea>
-        <DialogFooter className="no-print">
+        <DialogFooter className="no-print gap-2">
+            <Button onClick={() => exportToExcel(workers, year, month)} variant="outline">
+                <FileDown className="ml-2 h-4 w-4" />
+                تصدير Excel
+            </Button>
+            <Button onClick={handlePrint} variant="outline">
+                <Printer className="ml-2 h-4 w-4" />
+                طباعة التقرير
+            </Button>
           <DialogClose asChild>
             <Button type="button" variant="secondary">إغلاق</Button>
           </DialogClose>
