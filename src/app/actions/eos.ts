@@ -68,6 +68,7 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   const serviceDurationInDays = serviceDurationInMillis / (1000 * 60 * 60 * 24);
   const serviceDurationYears = serviceDurationInDays / 365.25;
 
+  // Use total salary (الأجر الفعلي) for gratuity calculation as per Saudi Labor Law
   const totalSalary = (worker.basicSalary || 0) + (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0);
   const halfMonthSalary = totalSalary / 2;
   const fullMonthSalary = totalSalary;
@@ -81,25 +82,25 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
     baseGratuity += serviceDurationYears * halfMonthSalary; // Less than or equal to 5 years
   }
 
-  // 2. Adjust gratuity based on termination reason
+  // 2. Adjust gratuity based on termination reason (Article 85, 87)
   let finalGratuity = 0;
   
   switch (reasonForTermination) {
     case 'resignation':
         if (serviceDurationYears >= 2 && serviceDurationYears < 5) {
-            finalGratuity = baseGratuity / 3;
+            finalGratuity = baseGratuity / 3; // One-third of the award
         } else if (serviceDurationYears >= 5 && serviceDurationYears < 10) {
-            finalGratuity = baseGratuity * (2 / 3);
+            finalGratuity = baseGratuity * (2 / 3); // Two-thirds of the award
         } else if (serviceDurationYears >= 10) {
-            finalGratuity = baseGratuity;
+            finalGratuity = baseGratuity; // Full award
         }
-        // If < 2 years, finalGratuity remains 0
+        // If < 2 years, finalGratuity remains 0, as the worker is not entitled to gratuity.
         break;
 
     case 'contract_termination_by_employer_article_77':
-    case 'contract_termination_by_employee_article_81': // As per Article 81, employee is entitled to full gratuity
+    case 'contract_termination_by_employee_article_81': // As per Article 81, employee is entitled to full gratuity if they leave due to force majeure
     case 'force_majeure':
-        finalGratuity = baseGratuity;
+        finalGratuity = baseGratuity; // Entitled to full gratuity
         break;
 
     case 'termination_article_80':
@@ -108,7 +109,8 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
         break;
 
     default:
-        finalGratuity = baseGratuity; // Default case, assume full gratuity
+        // Default case, assume full gratuity for scenarios not explicitly resulting in deduction.
+        finalGratuity = baseGratuity; 
         break;
   }
 
