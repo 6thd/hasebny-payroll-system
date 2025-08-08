@@ -10,11 +10,12 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2, Calculator, ShieldCheck } from 'lucide-react';
+import { Pencil, Trash2, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import EndOfServiceModal from './EndOfServiceModal';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import LeaveBalanceTestModal from './LeaveBalanceTestModal';
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
   const [formData, setFormData] = useState<Partial<Worker>>(initialFormState);
   const [isEditing, setIsEditing] = useState(false);
   const [eosModalState, setEosModalState] = useState<{ isOpen: boolean; worker: Worker | null }>({ isOpen: false, worker: null });
+  const [leaveBalanceModalState, setLeaveBalanceModalState] = useState<{ isOpen: boolean; worker: Worker | null }>({ isOpen: false, worker: null });
   const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +54,14 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
   const closeEosModal = () => {
     setEosModalState({ isOpen: false, worker: null });
     onDataUpdate(); // Refresh list after closing EOS modal
+  };
+
+  const openLeaveBalanceModal = (worker: Worker) => {
+    setLeaveBalanceModalState({ isOpen: true, worker: worker });
+  };
+
+  const closeLeaveBalanceModal = () => {
+    setLeaveBalanceModalState({ isOpen: false, worker: null });
   };
 
   const resetForm = () => {
@@ -124,6 +134,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                     </div>
                     {!isTerminated && (
                       <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openLeaveBalanceModal(w)} title="حساب رصيد الإجازة"><ShieldAlert className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => openEosModal(w)} title="حساب نهاية الخدمة"><Calculator className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
                         <AlertDialog>
@@ -185,6 +196,14 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
             onClose={closeEosModal}
             worker={eosModalState.worker}
             onFinalized={onDataUpdate}
+        />
+    )}
+
+    {leaveBalanceModalState.isOpen && leaveBalanceModalState.worker && (
+        <LeaveBalanceTestModal
+            isOpen={leaveBalanceModalState.isOpen}
+            onClose={closeLeaveBalanceModal}
+            worker={leaveBalanceModalState.worker}
         />
     )}
     </>
