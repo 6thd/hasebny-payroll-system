@@ -36,6 +36,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                 <CardTitle>تصفية رصيد الإجازات السنوية</CardTitle>
                 <CardDescription>
                     اختر موظفًا لحساب رصيد إجازاته المستحقة وتصفيتها. سيؤدي هذا إلى إعادة تعيين فترة استحقاق الإجازة للموظف.
+                    يعرض هذا الجدول فقط الموظفين الذين لديهم إجازات معتمدة.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -45,7 +46,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                             <TableRow>
                                 <TableHead>اسم الموظف</TableHead>
                                 <TableHead>الرقم الوظيفي</TableHead>
-                                <TableHead>تاريخ التعيين</TableHead>
+                                <TableHead>تاريخ آخر إجازة معتمدة</TableHead>
                                 <TableHead className="text-left">إجراء</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -54,7 +55,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                                 <TableRow key={worker.id}>
                                     <TableCell className="font-medium">{worker.name}</TableCell>
                                     <TableCell>{worker.employeeId || 'N/A'}</TableCell>
-                                    <TableCell>{worker.hireDate}</TableCell>
+                                    <TableCell>{worker.lastApprovedLeaveDate || 'N/A'}</TableCell>
                                     <TableCell className="text-left">
                                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(worker)}>
                                             <Calculator className="mr-2 h-4 w-4" />
@@ -65,7 +66,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={4} className="h-24 text-center">
-                                        لا يوجد موظفون نشطون لعرضهم.
+                                       لا يوجد موظفون لديهم إجازات معتمدة حاليًا.
                                     </TableCell>
                                 </TableRow>
                             )}

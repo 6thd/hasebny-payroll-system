@@ -47,6 +47,8 @@ export interface Worker {
   // New fields for leave balance calculation
   lastLeaveEndDate?: Timestamp;
   excludedPeriods?: ExcludedPeriod[];
+  // For UI context
+  lastApprovedLeaveDate?: string;
 }
 
 export type AppUser = FirebaseUser & Worker;

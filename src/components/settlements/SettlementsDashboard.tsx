@@ -11,23 +11,56 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import LeaveSettlementTab from './LeaveSettlementTab';
 import EosSettlementTab from './EosSettlementTab';
 
-
 export default function SettlementsDashboard() {
   const { user } = useAuth();
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [eosWorkers, setEosWorkers] = useState<Worker[]>([]);
+  const [leaveWorkers, setLeaveWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!user || user.role !== 'admin') {
       setLoading(false);
       return;
-    };
+    }
     setLoading(true);
     try {
-      const q = query(collection(db, "employees"), where("status", "==", "Active"));
-      const employeesSnapshot = await getDocs(q);
-      const workersToLoad = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
-      setWorkers(workersToLoad);
+      // 1. Fetch workers for End of Service tab (all active employees)
+      const eosQuery = query(collection(db, "employees"), where("status", "==", "Active"));
+      const eosSnapshot = await getDocs(eosQuery);
+      const eosWorkersToLoad = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      setEosWorkers(eosWorkersToLoad);
+
+      // 2. Fetch workers for Leave Settlement tab (only those with approved leave)
+      const leaveRequestsQuery = query(collection(db, "leaveRequests"), where("status", "==", "approved"));
+      const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
+      
+      const approvedLeaveData: { [employeeId: string]: string } = {};
+      leaveRequestsSnapshot.forEach(doc => {
+          const req = doc.data();
+          // Store the most recent start date for each employee
+          const existingDate = approvedLeaveData[req.employeeId];
+          const currentStartDate = req.startDate.toDate().toISOString().split('T')[0];
+          if (!existingDate || new Date(currentStartDate) > new Date(existingDate)) {
+             approvedLeaveData[req.employeeId] = currentStartDate;
+          }
+      });
+      
+      const approvedEmployeeIds = Object.keys(approvedLeaveData);
+
+      if (approvedEmployeeIds.length > 0) {
+        // Fetch only the employees who have approved leave requests
+        const leaveWorkersQuery = query(collection(db, "employees"), where("id", "in", approvedEmployeeIds));
+        const leaveWorkersSnapshot = await getDocs(leaveWorkersQuery);
+        const leaveWorkersToLoad = leaveWorkersSnapshot.docs.map(doc => {
+            const workerData = { id: doc.id, ...doc.data() } as Worker;
+            // Attach the last approved leave date for context in the UI
+            workerData.lastApprovedLeaveDate = approvedLeaveData[workerData.id];
+            return workerData;
+        });
+        setLeaveWorkers(leaveWorkersToLoad);
+      } else {
+        setLeaveWorkers([]);
+      }
 
     } catch (error) {
       console.error("Error fetching workers: ", error);
@@ -45,36 +78,36 @@ export default function SettlementsDashboard() {
   }
 
   if (user?.role !== 'admin') {
-      return (
-          <div className="p-8 text-center">
-              <p>ليس لديك الصلاحية للوصول إلى هذه الصفحة.</p>
-          </div>
-      )
+    return (
+      <div className="p-8 text-center">
+        <p>ليس لديك الصلاحية للوصول إلى هذه الصفحة.</p>
+      </div>
+    );
   }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-full mx-auto">
         <Card className="mb-8">
-            <CardHeader>
-                <CardTitle className="text-2xl">مركز تصفية المستحقات</CardTitle>
-                <CardDescription>
-                    قم بإدارة وتصفية مستحقات الموظفين من إجازات سنوية أو إنهاء خدمة من هنا.
-                </CardDescription>
-            </CardHeader>
+          <CardHeader>
+            <CardTitle className="text-2xl">مركز تصفية المستحقات</CardTitle>
+            <CardDescription>
+              قم بإدارة وتصفية مستحقات الموظفين من إجازات سنوية أو إنهاء خدمة من هنا.
+            </CardDescription>
+          </CardHeader>
         </Card>
 
         <Tabs defaultValue="leave" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="leave">تصفية الإجازات السنوية</TabsTrigger>
-                <TabsTrigger value="eos">تصفية نهاية الخدمة</TabsTrigger>
-            </TabsList>
-            <TabsContent value="leave">
-                <LeaveSettlementTab workers={workers} onAction={fetchData} />
-            </TabsContent>
-            <TabsContent value="eos">
-                <EosSettlementTab workers={workers} onAction={fetchData} />
-            </TabsContent>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="leave">تصفية الإجازات السنوية</TabsTrigger>
+            <TabsTrigger value="eos">تصفية نهاية الخدمة</TabsTrigger>
+          </TabsList>
+          <TabsContent value="leave">
+            <LeaveSettlementTab workers={leaveWorkers} onAction={fetchData} />
+          </TabsContent>
+          <TabsContent value="eos">
+            <EosSettlementTab workers={eosWorkers} onAction={fetchData} />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
