@@ -35,6 +35,9 @@ export interface Worker {
   totalRegular?: number;
   totalOvertime?: number;
   absentDays?: number;
+  // New fields for termination
+  status?: 'Active' | 'Terminated';
+  terminationDate?: string; // ISO 8601 format (YYYY-MM-DD)
 }
 
 export type AppUser = FirebaseUser & Worker;

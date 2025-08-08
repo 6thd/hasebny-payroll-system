@@ -5,10 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { calculateEndOfService, EndOfServiceOutput } from '@/app/actions/eos';
+import { calculateEndOfService, finalizeTermination, EndOfServiceOutput } from '@/app/actions/eos';
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -40,6 +40,7 @@ interface EndOfServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   worker: Worker;
+  onFinalized?: () => void;
 }
 
 const FormSchema = z.object({
@@ -61,9 +62,11 @@ const ResultRow = ({ label, value }: { label: string, value: string | number }) 
     </div>
 );
 
-export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServiceModalProps) {
+export default function EndOfServiceModal({ isOpen, onClose, worker, onFinalized }: EndOfServiceModalProps) {
   const [loading, setLoading] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [results, setResults] = useState<EndOfServiceOutput | null>(null);
+  const [formData, setFormData] = useState<FormValues | null>(null);
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -73,6 +76,7 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     setResults(null);
+    setFormData(data); // Save form data to use it for finalization
     const result = await calculateEndOfService({
       worker,
       ...data,
@@ -93,10 +97,39 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
       });
     }
   };
+  
+  const handleFinalize = async () => {
+    if (!results || !formData) return;
+    
+    setFinalizing(true);
+    const result = await finalizeTermination({
+        employeeId: worker.id,
+        terminationDate: formData.lastDayOfWork,
+        reasonForTermination: formData.reasonForTermination,
+        results: results,
+    });
+    setFinalizing(false);
+    
+    if (result.success) {
+        toast({
+            title: "تم إنهاء الخدمة بنجاح",
+            description: `تم تحديث حالة الموظف ${worker.name} وأرشفة سجل الخدمة.`,
+        });
+        onFinalized?.();
+        resetAndClose();
+    } else {
+        toast({
+            title: "خطأ في إنهاء الخدمة",
+            description: result.error,
+            variant: "destructive",
+        });
+    }
+  };
 
   const resetAndClose = () => {
       form.reset();
       setResults(null);
+      setFormData(null);
       onClose();
   }
 
@@ -121,6 +154,7 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
                         <Button
                           variant={"outline"}
                           className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                          disabled={!!results}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                           {field.value ? format(field.value, "PPP") : <span>اختر تاريخًا</span>}
@@ -142,7 +176,7 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>سبب إنهاء العلاقة العمالية</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!results}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="اختر سبب الإنهاء" />
@@ -161,10 +195,12 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
               )}
             />
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {loading ? "جارٍ الحساب..." : "احسب المستحقات"}
-            </Button>
+            {!results && (
+                <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? "جارٍ الحساب..." : "احسب المستحقات"}
+                </Button>
+            )}
           </form>
         </Form>
         
@@ -179,6 +215,12 @@ export default function EndOfServiceModal({ isOpen, onClose, worker }: EndOfServ
                 <div className="flex justify-between items-center py-2 bg-primary/10 px-3 rounded-lg">
                     <p className="font-bold text-lg text-primary">إجمالي المبلغ المستحق</p>
                     <p className="font-bold text-xl text-primary">{`${results.totalAmount.toLocaleString()} ريال`}</p>
+                </div>
+                <div className="pt-4 flex justify-end gap-2">
+                    <Button variant="destructive" onClick={handleFinalize} disabled={finalizing}>
+                        {finalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                        {finalizing ? "جارٍ التأكيد..." : "تأكيد وإنهاء الخدمة"}
+                    </Button>
                 </div>
             </div>
         )}

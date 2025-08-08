@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Worker } from '@/types';
 
@@ -68,62 +68,49 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   const serviceDurationInDays = serviceDurationInMillis / (1000 * 60 * 60 * 24);
   const serviceDurationYears = serviceDurationInDays / 365.25;
 
-  // Use total salary (الأجر الفعلي) for gratuity calculation as per Saudi Labor Law
   const totalSalary = (worker.basicSalary || 0) + (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0);
   const halfMonthSalary = totalSalary / 2;
   const fullMonthSalary = totalSalary;
 
-  // 1. Calculate base gratuity based on Article 84
   let baseGratuity = 0;
   if (serviceDurationYears > 5) {
-    baseGratuity += 5 * halfMonthSalary; // First 5 years
-    baseGratuity += (serviceDurationYears - 5) * fullMonthSalary; // Remaining years
+    baseGratuity += 5 * halfMonthSalary;
+    baseGratuity += (serviceDurationYears - 5) * fullMonthSalary;
   } else {
-    baseGratuity += serviceDurationYears * halfMonthSalary; // Less than or equal to 5 years
+    baseGratuity += serviceDurationYears * halfMonthSalary;
   }
 
-  // 2. Adjust gratuity based on termination reason (Article 85, 87)
   let finalGratuity = 0;
   
   switch (reasonForTermination) {
     case 'resignation':
         if (serviceDurationYears >= 2 && serviceDurationYears < 5) {
-            finalGratuity = baseGratuity / 3; // One-third of the award
+            finalGratuity = baseGratuity / 3;
         } else if (serviceDurationYears >= 5 && serviceDurationYears < 10) {
-            finalGratuity = baseGratuity * (2 / 3); // Two-thirds of the award
+            finalGratuity = baseGratuity * (2 / 3);
         } else if (serviceDurationYears >= 10) {
-            finalGratuity = baseGratuity; // Full award
+            finalGratuity = baseGratuity;
         }
-        // If < 2 years, finalGratuity remains 0, as the worker is not entitled to gratuity.
         break;
-
     case 'contract_termination_by_employer_article_77':
-    case 'contract_termination_by_employee_article_81': // As per Article 81, employee is entitled to full gratuity if they leave due to force majeure
+    case 'contract_termination_by_employee_article_81':
     case 'force_majeure':
-        finalGratuity = baseGratuity; // Entitled to full gratuity
+        finalGratuity = baseGratuity;
         break;
-
     case 'termination_article_80':
-        // As per Article 80, if the employee is terminated for one of the listed reasons, they are not entitled to any gratuity.
         finalGratuity = 0;
         break;
-
     default:
-        // Default case, assume full gratuity for scenarios not explicitly resulting in deduction.
         finalGratuity = baseGratuity; 
         break;
   }
 
-
-  // 3. Calculate leave balance value
   const totalLeaveEntitlement = serviceDurationYears * ANNUAL_LEAVE_ENTITLEMENT;
   const leaveTaken = await getAnnualLeaveTaken(worker.id, hireDate, lastDayOfWork);
   const remainingLeaveDays = totalLeaveEntitlement - leaveTaken;
-  const dailyRate = totalSalary / 30; // As per Saudi Labor Law for leave calculation
+  const dailyRate = totalSalary / 30;
   const leaveBalanceValue = Math.max(0, remainingLeaveDays * dailyRate);
 
-
-  // 4. Calculate total amount
   const totalAmount = finalGratuity + leaveBalanceValue;
   
   const result: EndOfServiceOutput = {
@@ -135,4 +122,55 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   };
 
   return { success: true, data: result };
+}
+
+// --- New Function to Finalize Termination ---
+const FinalizeTerminationInputSchema = z.object({
+    employeeId: z.string(),
+    terminationDate: z.date(),
+    reasonForTermination: z.string(),
+    results: z.object({
+        serviceDurationYears: z.number(),
+        baseGratuity: z.number(),
+        finalGratuity: z.number(),
+        leaveBalanceValue: z.number(),
+        totalAmount: z.number(),
+    }),
+});
+
+export async function finalizeTermination(input: z.infer<typeof FinalizeTerminationInputSchema>) {
+    const validation = FinalizeTerminationInputSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: 'بيانات غير صالحة.' };
+    }
+    
+    const { employeeId, terminationDate, reasonForTermination, results } = validation.data;
+
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Update the main employee document
+        const employeeRef = doc(db, 'employees', employeeId);
+        batch.update(employeeRef, {
+            status: 'Terminated',
+            terminationDate: terminationDate.toISOString().split('T')[0],
+        });
+
+        // 2. Create a historical record in the sub-collection
+        const historyRef = doc(collection(employeeRef, 'serviceHistory'));
+        batch.set(historyRef, {
+            ...results,
+            reasonForTermination,
+            terminationDate,
+            finalizedAt: serverTimestamp(),
+            // finalizedBy: auth.currentUser?.uid // You'd need to get the admin user's ID here
+        });
+
+        await batch.commit();
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error finalizing termination:', error);
+        return { success: false, error: 'حدث خطأ أثناء حفظ بيانات إنهاء الخدمة.' };
+    }
 }

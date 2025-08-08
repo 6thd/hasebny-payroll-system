@@ -10,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2, Calculator } from 'lucide-react';
+import { Pencil, Trash2, Calculator, ShieldCheck } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import EndOfServiceModal from './EndOfServiceModal';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -23,7 +25,7 @@ interface EmployeeManagementModalProps {
 
 const initialFormState: Partial<Worker> = {
   id: '', name: '', department: '', jobTitle: '', shift: 'الوردية النهارية', role: 'employee',
-  basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0,
+  basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0, status: 'Active',
 };
 
 export default function EmployeeManagementModal({ isOpen, onClose, workers, onDataUpdate }: EmployeeManagementModalProps) {
@@ -49,8 +51,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
   const closeEosModal = () => {
     setEosModalState({ isOpen: false, worker: null });
+    onDataUpdate(); // Refresh list after closing EOS modal
   };
-
 
   const resetForm = () => {
     setFormData(initialFormState);
@@ -68,6 +70,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
       dataToSave.id = workerId;
       dataToSave.employeeId = `EMP${workerId.slice(-4)}`;
       dataToSave.hireDate = new Date().toISOString().split('T')[0];
+      dataToSave.status = 'Active';
     }
     
     const { days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
@@ -98,6 +101,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     { key: 'workNature', label: 'طبيعة عمل' }, { key: 'transport', label: 'مواصلات' },
     { key: 'phone', label: 'هاتف' }, { key: 'food', label: 'طعام' },
   ];
+  
+  const sortedWorkers = [...workers].sort((a, b) => (a.status === 'Terminated' ? 1 : -1));
 
   return (
     <>
@@ -108,33 +113,39 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
           <div className="md:col-span-1 flex flex-col">
             <h3 className="font-semibold mb-2">قائمة الموظفين</h3>
             <ScrollArea className="border rounded-lg p-2 flex-grow">
-              {workers.map(w => (
-                <div key={w.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                  <div>
-                    <p className="font-semibold">{w.name}</p>
-                    <p className="text-sm text-muted-foreground">{w.jobTitle || 'N/A'}</p>
+              {sortedWorkers.map(w => {
+                const isTerminated = w.status === 'Terminated';
+                return (
+                  <div key={w.id} className={cn("flex items-center justify-between p-2 rounded-lg", isTerminated ? "bg-muted/50" : "hover:bg-muted")}>
+                    <div>
+                      <p className={cn("font-semibold", isTerminated && "text-muted-foreground line-through")}>{w.name}</p>
+                      <p className="text-sm text-muted-foreground">{w.jobTitle || 'N/A'}</p>
+                       {isTerminated && <Badge variant="destructive" className="mt-1">خدمة منتهية</Badge>}
+                    </div>
+                    {!isTerminated && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEosModal(w)} title="حساب نهاية الخدمة"><Calculator className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                              <AlertDialogDescription>سيتم حذف الموظف {w.name} بشكل نهائي.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(w.id)} className="bg-destructive hover:bg-destructive/90">حذف</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEosModal(w)} title="حساب نهاية الخدمة"><Calculator className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                          <AlertDialogDescription>سيتم حذف الموظف {w.name} بشكل نهائي.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(w.id)} className="bg-destructive hover:bg-destructive/90">حذف</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </ScrollArea>
           </div>
           <div className="md:col-span-2 flex flex-col">
@@ -173,6 +184,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
             isOpen={eosModalState.isOpen}
             onClose={closeEosModal}
             worker={eosModalState.worker}
+            onFinalized={onDataUpdate}
         />
     )}
     </>
