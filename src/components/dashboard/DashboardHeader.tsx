@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { AppUser, Worker } from '@/types';
 import { MONTHS } from '@/lib/utils';
-import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown } from 'lucide-react';
+import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown, Landmark } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
@@ -77,6 +77,10 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                     <DropdownMenuItem onClick={() => setEmployeeModalOpen(true)}>
                       <Users className="ml-2 h-4 w-4" />
                       إدارة الموظفين
+                    </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => router.push('/settlements')}>
+                        <Landmark className="ml-2 h-4 w-4" />
+                        مركز تصفية المستحقات
                     </DropdownMenuItem>
                   </>
                 )}

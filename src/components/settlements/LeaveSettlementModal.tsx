@@ -2,16 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
 import { calculateLeaveBalance, LeaveBalanceOutput } from '@/app/actions/leave-balance';
-import LoadingSpinner from '../../LoadingSpinner';
+import { settleLeaveBalance } from '@/app/actions/leave';
+import LoadingSpinner from '../LoadingSpinner';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal } from 'lucide-react';
+import { Terminal, ShieldCheck, Loader2 } from 'lucide-react';
 
-interface LeaveBalanceTestModalProps {
+interface LeaveSettlementModalProps {
   isOpen: boolean;
   onClose: () => void;
   worker: Worker;
@@ -25,8 +26,9 @@ const ResultRow = ({ label, value }: { label: string, value: string | number }) 
 );
 
 
-export default function LeaveBalanceTestModal({ isOpen, onClose, worker }: LeaveBalanceTestModalProps) {
+export default function LeaveSettlementModal({ isOpen, onClose, worker }: LeaveSettlementModalProps) {
   const [loading, setLoading] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<LeaveBalanceOutput | null>(null);
   const { toast } = useToast();
@@ -56,6 +58,31 @@ export default function LeaveBalanceTestModal({ isOpen, onClose, worker }: Leave
       handleCalculate();
     }
   }, [isOpen, handleCalculate]);
+  
+  const handleSettle = async () => {
+    if (!results) return;
+    setFinalizing(true);
+    const result = await settleLeaveBalance({
+        employeeId: worker.id,
+        settlementDate: new Date(),
+        results: results,
+    });
+    setFinalizing(false);
+
+    if (result.success) {
+        toast({
+            title: "تمت التصفية بنجاح",
+            description: `تمت تصفية رصيد إجازات الموظف ${worker.name}.`
+        });
+        onClose();
+    } else {
+        toast({
+            title: "خطأ في التصفية",
+            description: result.error,
+            variant: "destructive",
+        });
+    }
+  }
 
   const resetAndClose = () => {
     setResults(null);
@@ -67,7 +94,7 @@ export default function LeaveBalanceTestModal({ isOpen, onClose, worker }: Leave
     <Dialog open={isOpen} onOpenChange={resetAndClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>اختبار حساب رصيد الإجازة لـِ {worker.name}</DialogTitle>
+          <DialogTitle>تصفية رصيد الإجازة لـِ {worker.name}</DialogTitle>
         </DialogHeader>
         
         <div className="py-4 space-y-4 min-h-[300px]">
@@ -107,12 +134,16 @@ export default function LeaveBalanceTestModal({ isOpen, onClose, worker }: Leave
         </div>
 
         <DialogFooter className="mt-4 gap-2">
-            <Button type="button" variant="secondary" onClick={handleCalculate} disabled={loading}>
+            <Button type="button" variant="secondary" onClick={handleCalculate} disabled={loading || finalizing}>
                 {loading ? '...جاري الحساب' : 'إعادة الحساب'}
             </Button>
-            <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={resetAndClose}>إغلاق</Button>
-            </DialogClose>
+            {results && (
+                 <Button variant="default" onClick={handleSettle} disabled={finalizing || loading}>
+                    {finalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    {finalizing ? "جارٍ الحفظ..." : "تأكيد وتصفية الرصيد"}
+                </Button>
+            )}
+            <Button type="button" variant="outline" onClick={resetAndClose} disabled={finalizing}>إغلاق</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

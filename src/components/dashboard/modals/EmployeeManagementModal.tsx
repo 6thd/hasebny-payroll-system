@@ -10,12 +10,11 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import EndOfServiceModal from './EndOfServiceModal';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import LeaveBalanceTestModal from './LeaveBalanceTestModal';
+import { useRouter } from 'next/navigation';
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -32,9 +31,8 @@ const initialFormState: Partial<Worker> = {
 export default function EmployeeManagementModal({ isOpen, onClose, workers, onDataUpdate }: EmployeeManagementModalProps) {
   const [formData, setFormData] = useState<Partial<Worker>>(initialFormState);
   const [isEditing, setIsEditing] = useState(false);
-  const [eosModalState, setEosModalState] = useState<{ isOpen: boolean; worker: Worker | null }>({ isOpen: false, worker: null });
-  const [leaveBalanceModalState, setLeaveBalanceModalState] = useState<{ isOpen: boolean; worker: Worker | null }>({ isOpen: false, worker: null });
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -46,23 +44,11 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     setFormData(worker);
     setIsEditing(true);
   };
-  
-  const openEosModal = (worker: Worker) => {
-    setEosModalState({ isOpen: true, worker: worker });
-  };
 
-  const closeEosModal = () => {
-    setEosModalState({ isOpen: false, worker: null });
-    onDataUpdate(); // Refresh list after closing EOS modal
-  };
-
-  const openLeaveBalanceModal = (worker: Worker) => {
-    setLeaveBalanceModalState({ isOpen: true, worker: worker });
-  };
-
-  const closeLeaveBalanceModal = () => {
-    setLeaveBalanceModalState({ isOpen: false, worker: null });
-  };
+  const navigateToSettlements = () => {
+    router.push('/settlements');
+    onClose();
+  }
 
   const resetForm = () => {
     setFormData(initialFormState);
@@ -121,7 +107,12 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
         <DialogHeader><DialogTitle>إدارة الموظفين</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-grow overflow-hidden">
           <div className="md:col-span-1 flex flex-col">
-            <h3 className="font-semibold mb-2">قائمة الموظفين</h3>
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">قائمة الموظفين</h3>
+                <Button variant="link" onClick={navigateToSettlements}>
+                    مركز المستحقات
+                </Button>
+            </div>
             <ScrollArea className="border rounded-lg p-2 flex-grow">
               {sortedWorkers.map(w => {
                 const isTerminated = w.status === 'Terminated';
@@ -134,8 +125,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                     </div>
                     {!isTerminated && (
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openLeaveBalanceModal(w)} title="حساب رصيد الإجازة"><ShieldAlert className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEosModal(w)} title="حساب نهاية الخدمة"><Calculator className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -189,23 +178,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
         </div>
       </DialogContent>
     </Dialog>
-    
-    {eosModalState.isOpen && eosModalState.worker && (
-        <EndOfServiceModal 
-            isOpen={eosModalState.isOpen}
-            onClose={closeEosModal}
-            worker={eosModalState.worker}
-            onFinalized={onDataUpdate}
-        />
-    )}
-
-    {leaveBalanceModalState.isOpen && leaveBalanceModalState.worker && (
-        <LeaveBalanceTestModal
-            isOpen={leaveBalanceModalState.isOpen}
-            onClose={closeLeaveBalanceModal}
-            worker={leaveBalanceModalState.worker}
-        />
-    )}
     </>
   );
 }

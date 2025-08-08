@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { collection, getDocs, query, where, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Worker } from '@/types';
+import { calculateLeaveBalance } from './leave-balance';
+
 
 const EndOfServiceInputSchema = z.object({
   worker: z.any(), // Not ideal, but passing complex objects to server actions can be tricky with Zod.
@@ -27,29 +29,8 @@ export type EndOfServiceOutput = {
   totalAmount: number;
 };
 
-const ANNUAL_LEAVE_ENTITLEMENT = 30; // Annual leave days per year
-
-async function getAnnualLeaveTaken(employeeId: string, serviceStartDate: Date, serviceEndDate: Date): Promise<number> {
-    const q = query(
-        collection(db, 'leaveRequests'),
-        where('employeeId', '==', employeeId),
-        where('status', '==', 'approved'),
-        where('leaveType', '==', 'annual')
-    );
-
-    const approvedLeavesSnap = await getDocs(q);
-    let daysTaken = 0;
-    approvedLeavesSnap.forEach(doc => {
-        const req = doc.data();
-        const reqStart = req.startDate.toDate();
-        // Only count leaves within the service period
-        if (reqStart >= serviceStartDate && reqStart <= serviceEndDate) {
-            const reqEnd = req.endDate.toDate();
-            daysTaken += (reqEnd.getTime() - reqStart.getTime()) / (1000 * 3600 * 24) + 1;
-        }
-    });
-    return daysTaken;
-}
+// This function is no longer needed here as it's part of the leave-balance action
+// async function getAnnualLeaveTaken(employeeId: string, serviceStartDate: Date, serviceEndDate: Date): Promise<number> { ... }
 
 export async function calculateEndOfService(input: EndOfServiceInput): Promise<{ success: true; data: EndOfServiceOutput } | { success: false; error: string }> {
   const validation = EndOfServiceInputSchema.safeParse(input);
@@ -105,12 +86,10 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
         break;
   }
 
-  const totalLeaveEntitlement = serviceDurationYears * ANNUAL_LEAVE_ENTITLEMENT;
-  const leaveTaken = await getAnnualLeaveTaken(worker.id, hireDate, lastDayOfWork);
-  const remainingLeaveDays = totalLeaveEntitlement - leaveTaken;
-  const dailyRate = totalSalary / 30;
-  const leaveBalanceValue = Math.max(0, remainingLeaveDays * dailyRate);
-
+  // Calculate leave balance value using the dedicated action
+  const leaveBalanceResult = await calculateLeaveBalance({ employeeId: worker.id });
+  const leaveBalanceValue = leaveBalanceResult.success ? leaveBalanceResult.data.monetaryValue : 0;
+  
   const totalAmount = finalGratuity + leaveBalanceValue;
   
   const result: EndOfServiceOutput = {
@@ -124,7 +103,7 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   return { success: true, data: result };
 }
 
-// --- New Function to Finalize Termination ---
+// --- Function to Finalize Termination ---
 const FinalizeTerminationInputSchema = z.object({
     employeeId: z.string(),
     terminationDate: z.date(),
@@ -159,10 +138,11 @@ export async function finalizeTermination(input: z.infer<typeof FinalizeTerminat
         // 2. Create a historical record in the sub-collection
         const historyRef = doc(collection(employeeRef, 'serviceHistory'));
         batch.set(historyRef, {
-            ...results,
+            type: 'EndOfService',
             reasonForTermination,
             terminationDate,
             finalizedAt: serverTimestamp(),
+            ...results,
             // finalizedBy: auth.currentUser?.uid // You'd need to get the admin user's ID here
         });
 

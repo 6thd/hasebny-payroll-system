@@ -1,13 +1,9 @@
 'use server';
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, where, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import {
-  getFirestore,
-  writeBatch,
-} from 'firebase/firestore';
 
 const leaveRequestSchema = z.object({
   employeeId: z.string(),
@@ -38,6 +34,7 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
     });
 
     revalidatePath('/'); 
+    revalidatePath('/settlements');
 
     return { success: true };
   } catch (error) {
@@ -134,6 +131,7 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
                     'تم رفض طلب الإجازة الخاص بك لعدم كفاية الرصيد.'
                 );
                 revalidatePath('/');
+                revalidatePath('/settlements');
                 return { success: false, error: 'رصيد الموظف غير كافٍ. تم رفض الطلب تلقائيًا.' };
             }
         }
@@ -178,6 +176,7 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
         );
 
         revalidatePath('/');
+        revalidatePath('/settlements');
         return { success: true };
     } catch (error) {
         console.error('Error approving leave request:', error);
@@ -205,9 +204,54 @@ export async function rejectLeaveRequest(requestId: string) {
         );
 
         revalidatePath('/');
+        revalidatePath('/settlements');
         return { success: true };
     } catch (error) {
         console.error('Error rejecting leave request:', error);
         return { success: false, error: 'حدث خطأ أثناء رفض الطلب.' };
+    }
+}
+
+
+// --- New Function to Settle Leave Balance ---
+const SettleLeaveBalanceInputSchema = z.object({
+    employeeId: z.string(),
+    settlementDate: z.date(),
+    results: z.any(), // a bit unsafe, but we trust our own data
+});
+
+
+export async function settleLeaveBalance(input: z.infer<typeof SettleLeaveBalanceInputSchema>) {
+    const validation = SettleLeaveBalanceInputSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: 'بيانات غير صالحة.' };
+    }
+    
+    const { employeeId, settlementDate, results } = validation.data;
+
+    try {
+        const batch = writeBatch(db);
+
+        const employeeRef = doc(db, 'employees', employeeId);
+        // 1. Update the employee's lastLeaveEndDate to reset the accrual period
+        batch.update(employeeRef, {
+            lastLeaveEndDate: Timestamp.fromDate(settlementDate),
+        });
+
+        // 2. Create a historical record of the settlement
+        const historyRef = doc(collection(employeeRef, 'serviceHistory'));
+        batch.set(historyRef, {
+            type: 'LeaveSettlement',
+            settlementDate,
+            settledAt: serverTimestamp(),
+            ...results,
+        });
+
+        await batch.commit();
+        revalidatePath('/settlements');
+        return { success: true };
+    } catch (error) {
+        console.error('Error settling leave balance:', error);
+        return { success: false, error: 'حدث خطأ أثناء حفظ بيانات تصفية الإجازة.' };
     }
 }
