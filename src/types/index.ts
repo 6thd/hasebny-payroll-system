@@ -10,6 +10,12 @@ export interface DayData {
   overtimeHours?: number;
 }
 
+export interface ExcludedPeriod {
+  start: Timestamp;
+  end: Timestamp;
+  reason: 'UnpaidLeave' | 'Other';
+}
+
 export interface Worker {
   id: string;
   authUid?: string;
@@ -38,6 +44,9 @@ export interface Worker {
   // New fields for termination
   status?: 'Active' | 'Terminated';
   terminationDate?: string; // ISO 8601 format (YYYY-MM-DD)
+  // New fields for leave balance calculation
+  lastLeaveEndDate?: Timestamp;
+  excludedPeriods?: ExcludedPeriod[];
 }
 
 export type AppUser = FirebaseUser & Worker;
