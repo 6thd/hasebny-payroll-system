@@ -9,6 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { History } from 'lucide-react';
+import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
+
 
 interface LeaveRequest {
     id: string;
@@ -48,7 +51,6 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
             const q = query(
                 collection(db, 'leaveRequests'), 
                 where('employeeId', '==', employeeId)
-                // orderBy('createdAt', 'desc') // This requires a composite index. We will sort client-side instead.
             );
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
@@ -66,12 +68,15 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
     }, [employeeId, toast]);
 
     useEffect(() => {
-        fetchRequests();
-         // Listen for global data updates to refetch
         const handleDataUpdate = () => fetchRequests();
+        fetchRequests();
         window.addEventListener('data-updated', handleDataUpdate);
         return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, [fetchRequests]);
+
+    const formatDate = (timestamp: Timestamp) => {
+        return format(timestamp.toDate(), 'P', { locale: arSA });
+    };
 
     return (
         <Card>
@@ -103,8 +108,8 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                                 {requests.map(req => (
                                     <TableRow key={req.id}>
                                         <TableCell>{leaveTypeMap[req.leaveType] || req.leaveType}</TableCell>
-                                        <TableCell>{req.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                        <TableCell>{req.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                        <TableCell>{formatDate(req.startDate)}</TableCell>
+                                        <TableCell>{formatDate(req.endDate)}</TableCell>
                                         <TableCell>
                                             <Badge variant={statusMap[req.status]?.variant || 'default'}>
                                                 {statusMap[req.status]?.label || req.status}
