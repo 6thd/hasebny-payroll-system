@@ -28,15 +28,18 @@ export default function SettlementsDashboard() {
     }
     setLoading(true);
     try {
-      // 1. Fetch workers for End of Service tab (all non-terminated employees)
+      // --- Fetch for End of Service Tab ---
       const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
       const eosSnapshot = await getDocs(eosQuery);
-      const allActiveWorkers = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
-      
-      // FIX: Populate the eosWorkers state which is passed to the EosSettlementTab
-      setEosWorkers(allActiveWorkers);
+      const activeWorkersForEos = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      setEosWorkers(activeWorkersForEos);
 
-      // 2. Fetch workers for Leave Settlement tab
+      // --- Fetch for Leave Settlement Tab ---
+      // 1. Get all employees regardless of status
+      const allEmployeesSnapshot = await getDocs(collection(db, "employees"));
+      const allWorkers = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      
+      // 2. Get approved leave requests
       const leaveRequestsQuery = query(
         collection(db, "leaveRequests"), 
         where("status", "==", "approved"),
@@ -56,9 +59,9 @@ export default function SettlementsDashboard() {
       
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
+      // 3. Filter the *full* list of employees
       if (approvedEmployeeIds.length > 0) {
-        // Filter from the already fetched active workers list
-        const leaveWorkersToLoad = allActiveWorkers
+        const leaveWorkersToLoad = allWorkers
             .filter(worker => approvedEmployeeIds.includes(worker.id))
             .map(worker => ({
                 ...worker,
@@ -75,6 +78,7 @@ export default function SettlementsDashboard() {
       setLoading(false);
     }
   }, [user]);
+
 
   useEffect(() => {
     fetchData();
