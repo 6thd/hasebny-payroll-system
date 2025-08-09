@@ -101,7 +101,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                      <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة سابقة.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <Table dir="rtl">
+                        <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>نوع الإجازة</TableHead>
