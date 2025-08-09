@@ -30,14 +30,18 @@ export default function SettlementsDashboard() {
       const eosWorkersToLoad = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setEosWorkers(eosWorkersToLoad);
 
-      // 2. Fetch workers for Leave Settlement tab (only those with approved leave)
-      const leaveRequestsQuery = query(collection(db, "leaveRequests"), where("status", "==", "approved"));
+      // 2. Fetch workers for Leave Settlement tab
+      // Fetch leave requests that are approved and are not 'sick' leave
+      const leaveRequestsQuery = query(
+        collection(db, "leaveRequests"), 
+        where("status", "==", "approved"),
+        where("leaveType", "in", ["annual", "emergency"]) // Explicitly define types that count towards balance
+      );
       const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
       
       const approvedLeaveData: { [employeeId: string]: string } = {};
       leaveRequestsSnapshot.forEach(doc => {
           const req = doc.data();
-          // Store the most recent start date for each employee
           const existingDate = approvedLeaveData[req.employeeId];
           const currentStartDate = req.startDate.toDate().toISOString().split('T')[0];
           if (!existingDate || new Date(currentStartDate) > new Date(existingDate)) {
@@ -48,12 +52,10 @@ export default function SettlementsDashboard() {
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
       if (approvedEmployeeIds.length > 0) {
-        // Fetch only the employees who have approved leave requests
         const leaveWorkersQuery = query(collection(db, "employees"), where("id", "in", approvedEmployeeIds));
         const leaveWorkersSnapshot = await getDocs(leaveWorkersQuery);
         const leaveWorkersToLoad = leaveWorkersSnapshot.docs.map(doc => {
             const workerData = { id: doc.id, ...doc.data() } as Worker;
-            // Attach the last approved leave date for context in the UI
             workerData.lastApprovedLeaveDate = approvedLeaveData[workerData.id];
             return workerData;
         });
