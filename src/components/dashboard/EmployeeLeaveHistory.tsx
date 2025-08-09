@@ -5,7 +5,6 @@ import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { History } from 'lucide-react';
@@ -100,30 +99,44 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                      <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة سابقة.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>نوع الإجازة</TableHead>
-                                    <TableHead>تاريخ البدء</TableHead>
-                                    <TableHead>تاريخ الانتهاء</TableHead>
-                                    <TableHead>الحالة</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {requests.map((req) => (
-                                    <TableRow key={req.id}>
-                                        <TableCell>{leaveTypeMap[req.leaveType] || req.leaveType}</TableCell>
-                                        <TableCell>{formatDate(req.startDate)}</TableCell>
-                                        <TableCell>{formatDate(req.endDate)}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={statusMap[req.status]?.variant || 'secondary'}>
-                                                {statusMap[req.status]?.label || req.status}
-                                            </Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                نوع الإجازة
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                تاريخ البدء
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                تاريخ الانتهاء
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                الحالة
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                            {requests.map((req) => (
+                                <tr key={req.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-right">
+                                        {leaveTypeMap[req.leaveType] || req.leaveType}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
+                                        {formatDate(req.startDate)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
+                                        {formatDate(req.endDate)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
+                                        <Badge variant={statusMap[req.status]?.variant || 'secondary'}>
+                                            {statusMap[req.status]?.label || req.status}
+                                        </Badge>
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </CardContent>
