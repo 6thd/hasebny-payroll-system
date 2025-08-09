@@ -25,7 +25,7 @@ export default function SettlementsDashboard() {
     setLoading(true);
     try {
       // 1. Fetch workers for End of Service tab (all active employees)
-      const eosQuery = query(collection(db, "employees"), where("status", "==", "Active"));
+      const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
       const eosSnapshot = await getDocs(eosQuery);
       const eosWorkersToLoad = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setEosWorkers(eosWorkersToLoad);
