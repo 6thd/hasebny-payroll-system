@@ -55,6 +55,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             
+            // Sort client-side to avoid composite index
             fetchedRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
             setRequests(fetchedRequests);
@@ -75,7 +76,12 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
 
     const formatDate = (timestamp: Timestamp) => {
         if (!timestamp) return 'N/A';
-        return format(timestamp.toDate(), 'P', { locale: arSA });
+        try {
+          return format(timestamp.toDate(), 'P', { locale: arSA });
+        } catch (e) {
+            console.error("Invalid timestamp for date formatting:", timestamp);
+            return 'تاريخ غير صالح';
+        }
     };
 
     return (
@@ -95,7 +101,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                      <p className="text-center text-muted-foreground py-4">لا توجد طلبات إجازة سابقة.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <Table>
+                        <Table dir="rtl">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>نوع الإجازة</TableHead>
@@ -105,7 +111,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {requests.map(req => (
+                                {requests.map((req) => (
                                     <TableRow key={req.id}>
                                         <TableCell>{leaveTypeMap[req.leaveType] || req.leaveType}</TableCell>
                                         <TableCell>{formatDate(req.startDate)}</TableCell>
