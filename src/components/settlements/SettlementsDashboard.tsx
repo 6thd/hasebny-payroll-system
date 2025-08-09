@@ -10,9 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LeaveSettlementTab from './LeaveSettlementTab';
 import EosSettlementTab from './EosSettlementTab';
+import { Button } from '../ui/button';
+import { useRouter } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
 
 export default function SettlementsDashboard() {
   const { user } = useAuth();
+  const router = useRouter();
   const [eosWorkers, setEosWorkers] = useState<Worker[]>([]);
   const [leaveWorkers, setLeaveWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +29,7 @@ export default function SettlementsDashboard() {
     setLoading(true);
     try {
       // 1. Fetch workers for End of Service tab (all active employees)
-      const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
+      const eosQuery = query(collection(db, "employees"), where("status", "==", "Active"));
       const eosSnapshot = await getDocs(eosQuery);
       const eosWorkersToLoad = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setEosWorkers(eosWorkersToLoad);
@@ -52,6 +56,7 @@ export default function SettlementsDashboard() {
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
       if (approvedEmployeeIds.length > 0) {
+        // Since firestore 'in' query supports max 10 elements, we might need to do multiple queries if many employees
         const leaveWorkersQuery = query(collection(db, "employees"), where("id", "in", approvedEmployeeIds));
         const leaveWorkersSnapshot = await getDocs(leaveWorkersQuery);
         const leaveWorkersToLoad = leaveWorkersSnapshot.docs.map(doc => {
@@ -92,10 +97,18 @@ export default function SettlementsDashboard() {
       <div className="max-w-full mx-auto">
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="text-2xl">مركز تصفية المستحقات</CardTitle>
-            <CardDescription>
-              قم بإدارة وتصفية مستحقات الموظفين من إجازات سنوية أو إنهاء خدمة من هنا.
-            </CardDescription>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle className="text-2xl">مركز تصفية المستحقات</CardTitle>
+                    <CardDescription>
+                    قم بإدارة وتصفية مستحقات الموظفين من إجازات سنوية أو إنهاء خدمة من هنا.
+                    </CardDescription>
+                </div>
+                <Button onClick={() => router.push('/')}>
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                    العودة للوحة التحكم
+                </Button>
+            </div>
           </CardHeader>
         </Card>
 
