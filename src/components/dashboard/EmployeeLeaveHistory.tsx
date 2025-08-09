@@ -30,7 +30,7 @@ const leaveTypeMap: { [key: string]: string } = {
 
 const statusMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
     pending: { label: 'قيد المراجعة', variant: 'outline' },
-    approved: { label: 'مقبولة', variant: 'default' }, // 'default' is primary color
+    approved: { label: 'مقبولة', variant: 'default' },
     rejected: { label: 'مرفوضة', variant: 'destructive' },
 };
 
@@ -55,7 +55,6 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             
-            // Sort client-side to avoid composite index
             fetchedRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
             setRequests(fetchedRequests);
