@@ -32,9 +32,10 @@ export default function SettlementsDashboard() {
     setLoading(true);
     try {
       // --- Fetch for End of Service Tab ---
-      const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
-      const eosSnapshot = await getDocs(eosQuery);
-      const activeWorkersForEos = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      const eosSnapshot = await getDocs(collection(db, "employees"));
+      const activeWorkersForEos = eosSnapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as Worker))
+        .filter(w => (w.status ?? "Active") !== "Terminated");
       setEosWorkers(activeWorkersForEos);
 
       // --- Fetch for Leave Settlement Tab ---
