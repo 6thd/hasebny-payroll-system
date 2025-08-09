@@ -184,7 +184,11 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                   <div><Label>القسم</Label><Input name="department" value={formData.department || ''} onChange={handleInputChange} /></div>
                   <div><Label>الوظيفة</Label><Input name="jobTitle" value={formData.jobTitle || ''} onChange={handleInputChange} /></div>
                   <div><Label>تاريخ التعيين</Label><Input type="date" name="hireDate" value={(formData as any).hireDate || ''} onChange={handleInputChange} /></div>
-                  <div><Label>الرقم الوظيفي</Label><Input name="employeeId" value={(formData as any).employeeId || ''} onChange={handleInputChange} /></div>
+                  <div>
+                    <Label>الرقم الوظيفي</Label>
+                    <Input name="employeeId" value={(formData as any).employeeId || ''} onChange={handleInputChange} disabled />
+                     <p className="text-xs text-muted-foreground mt-1">يتم إنشاء الرقم الوظيفي تلقائياً.</p>
+                  </div>
                 </div>
                 <h4 className="font-semibold pt-4 border-t">البيانات المالية الثابتة</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
