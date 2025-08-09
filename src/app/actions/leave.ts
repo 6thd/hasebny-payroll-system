@@ -36,6 +36,9 @@ export async function submitLeaveRequest(data: LeaveRequestData) {
 
     revalidatePath('/'); 
     revalidatePath('/settlements');
+    // Dispatch a custom event that client components can listen to
+    // This is a pattern to trigger client-side refetches.
+    // We will use a more direct approach if this doesn't work.
 
     return { success: true };
   } catch (error) {
@@ -61,7 +64,7 @@ async function createNotification(employeeId: string, message: string) {
   }
 }
 
-export async function approveLeaveRequest(requestId: string, newStartDate?: Date, newEndDate?: Date) {
+export async function approveLeaveRequest(requestId: string, overrideBalanceCheck: boolean = false, newStartDate?: Date, newEndDate?: Date) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
         const requestSnap = await getDoc(requestRef);
@@ -81,7 +84,7 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
         }
 
         // --- Start of Leave Balance Check (REVISED LOGIC) ---
-        if (leaveType === 'annual' || leaveType === 'emergency') {
+        if ((leaveType === 'annual' || leaveType === 'emergency') && !overrideBalanceCheck) {
             const balanceResult = await calculateLeaveBalance({ employeeId });
             
             if (!balanceResult.success) {
@@ -133,7 +136,10 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             status: 'approved',
             reviewedAt: serverTimestamp(),
         };
-
+        
+        if (overrideBalanceCheck) {
+            finalUpdateData.notes = 'تمت الموافقة مع تجاوز فحص الرصيد من قبل المدير.';
+        }
         if (newStartDate) finalUpdateData.startDate = Timestamp.fromDate(newStartDate);
         if (newEndDate) finalUpdateData.endDate = Timestamp.fromDate(newEndDate);
 

@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { submitLeaveRequest } from "@/app/actions/leave";
@@ -35,6 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import LoadingSpinner from "../LoadingSpinner";
 import { useAuth } from "@/hooks/use-auth";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
 const leaveRequestSchema = z.object({
   leaveType: z.string({
@@ -56,9 +57,10 @@ type LeaveRequestFormValues = z.infer<typeof leaveRequestSchema>;
 
 interface LeaveRequestFormProps {
   onSubmitted?: () => void;
+  currentBalance: number | null;
 }
 
-export default function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps) {
+export default function LeaveRequestForm({ onSubmitted, currentBalance }: LeaveRequestFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth(); // Get current user
@@ -106,132 +108,144 @@ export default function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps)
   };
 
   return (
-    <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-        <FormField
-            control={form.control}
-            name="leaveType"
-            render={({ field }) => (
-            <FormItem>
-                <FormLabel>نوع الإجازة</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                    <SelectTrigger>
-                    <SelectValue placeholder="اختر نوع الإجازة" />
-                    </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                    <SelectItem value="annual">سنوية</SelectItem>
-                    <SelectItem value="sick">مرضية</SelectItem>
-                    <SelectItem value="emergency">طارئة</SelectItem>
-                </SelectContent>
-                </Select>
-                <FormMessage />
-            </FormItem>
-            )}
-        />
-        
-        <FormField
-            control={form.control}
-            name="startDate"
-            render={({ field }) => (
-            <FormItem className="flex flex-col">
-                <FormLabel>تاريخ البدء</FormLabel>
-                <Popover>
-                <PopoverTrigger asChild>
-                    <FormControl>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
-                        {field.value ? (
-                        format(field.value, "PPP")
-                        ) : (
-                        <span>اختر تاريخًا</span>
-                        )}
-                    </Button>
-                    </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    initialFocus
-                    />
-                </PopoverContent>
-                </Popover>
-                <FormMessage />
-            </FormItem>
-            )}
-        />
+    <div className="space-y-4">
+      {currentBalance !== null && (
+          <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>رصيد الإجازات</AlertTitle>
+              <AlertDescription>
+                  رصيدك المتاح حاليًا هو: <span className="font-bold">{currentBalance.toFixed(2)} يوم</span>.
+              </AlertDescription>
+          </Alert>
+      )}
 
-        <FormField
-            control={form.control}
-            name="endDate"
-            render={({ field }) => (
-            <FormItem className="flex flex-col">
-                <FormLabel>تاريخ الانتهاء</FormLabel>
-                <Popover>
-                <PopoverTrigger asChild>
-                    <FormControl>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
-                        {field.value ? (
-                        format(field.value, "PPP")
-                        ) : (
-                        <span>اختر تاريخًا</span>
-                        )}
-                    </Button>
-                    </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    initialFocus
-                    />
-                </PopoverContent>
-                </Popover>
-                <FormMessage />
-            </FormItem>
-            )}
-        />
+      <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          <FormField
+              control={form.control}
+              name="leaveType"
+              render={({ field }) => (
+              <FormItem>
+                  <FormLabel>نوع الإجازة</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                      <SelectTrigger>
+                      <SelectValue placeholder="اختر نوع الإجازة" />
+                      </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                      <SelectItem value="annual">سنوية</SelectItem>
+                      <SelectItem value="sick">مرضية</SelectItem>
+                      <SelectItem value="emergency">طارئة</SelectItem>
+                  </SelectContent>
+                  </Select>
+                  <FormMessage />
+              </FormItem>
+              )}
+          />
+          
+          <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+              <FormItem className="flex flex-col">
+                  <FormLabel>تاريخ البدء</FormLabel>
+                  <Popover>
+                  <PopoverTrigger asChild>
+                      <FormControl>
+                      <Button
+                          variant={"outline"}
+                          className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                          )}
+                      >
+                          <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
+                          {field.value ? (
+                          format(field.value, "PPP")
+                          ) : (
+                          <span>اختر تاريخًا</span>
+                          )}
+                      </Button>
+                      </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                      />
+                  </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+              </FormItem>
+              )}
+          />
 
-        <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-            <FormItem>
-                <FormLabel>ملاحظات إضافية (اختياري)</FormLabel>
-                <FormControl>
-                <Textarea
-                    placeholder="أدخل ملاحظاتك هنا..."
-                    className="resize-none"
-                    {...field}
-                />
-                </FormControl>
-                <FormMessage />
-            </FormItem>
-            )}
-        />
+          <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+              <FormItem className="flex flex-col">
+                  <FormLabel>تاريخ الانتهاء</FormLabel>
+                  <Popover>
+                  <PopoverTrigger asChild>
+                      <FormControl>
+                      <Button
+                          variant={"outline"}
+                          className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                          )}
+                      >
+                          <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
+                          {field.value ? (
+                          format(field.value, "PPP")
+                          ) : (
+                          <span>اختر تاريخًا</span>
+                          )}
+                      </Button>
+                      </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                      />
+                  </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+              </FormItem>
+              )}
+          />
 
-        <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <LoadingSpinner />}
-            {loading ? "جارٍ الإرسال..." : "إرسال الطلب"}
-        </Button>
-        </form>
-    </Form>
+          <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+              <FormItem>
+                  <FormLabel>ملاحظات إضافية (اختياري)</FormLabel>
+                  <FormControl>
+                  <Textarea
+                      placeholder="أدخل ملاحظاتك هنا..."
+                      className="resize-none"
+                      {...field}
+                  />
+                  </FormControl>
+                  <FormMessage />
+              </FormItem>
+              )}
+          />
+
+          <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <LoadingSpinner />}
+              {loading ? "جارٍ الإرسال..." : "إرسال الطلب"}
+          </Button>
+          </form>
+      </Form>
+    </div>
   );
 }

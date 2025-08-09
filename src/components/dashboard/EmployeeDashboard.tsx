@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MONTHS, calculatePayroll } from '@/lib/utils';
 import type { Worker } from '@/types';
 import AttendanceTable from './AttendanceTable';
 import LeaveRequestForm from './LeaveRequestForm';
-import { FilePlus2 } from 'lucide-react';
+import { FilePlus2, Loader2 } from 'lucide-react';
 import EmployeeLeaveHistory from './EmployeeLeaveHistory';
+import { calculateLeaveBalance } from '@/app/actions/leave-balance';
+import { useToast } from '@/hooks/use-toast';
 
 interface EmployeeDashboardProps {
   employee: Worker;
@@ -31,9 +33,15 @@ const StatCard = ({ title, value }: { title: string; value: string | number }) =
   </Card>
 );
 
+interface LeaveModalState {
+    isOpen: boolean;
+    isLoading: boolean;
+    balance: number | null;
+}
 
 export default function EmployeeDashboard({ employee, year, month, onDateChange, onDataUpdate }: EmployeeDashboardProps) {
-  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [leaveModalState, setLeaveModalState] = useState<LeaveModalState>({ isOpen: false, isLoading: false, balance: null });
+  const { toast } = useToast();
   
   if (!employee) {
     return <div className="text-center text-red-500">لا يمكن تحميل بيانات الموظف.</div>;
@@ -43,8 +51,28 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
   const { netSalary } = calculatePayroll(employee, year, month);
   const CURRENCY = 'ريال';
   
+  const handleOpenLeaveModal = async () => {
+      setLeaveModalState({ ...leaveModalState, isLoading: true });
+      try {
+          const result = await calculateLeaveBalance({ employeeId: employee.id });
+          if (result.success) {
+              setLeaveModalState({ isOpen: true, isLoading: false, balance: result.data.accruedDays });
+          } else {
+              toast({ title: "خطأ", description: result.error, variant: "destructive" });
+              setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
+          }
+      } catch (error) {
+          toast({ title: "خطأ", description: "لم نتمكن من جلب رصيد الإجازات.", variant: "destructive" });
+          setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
+      }
+  };
+
+  const handleCloseLeaveModal = () => {
+    setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
+  };
+  
   const handleLeaveSubmitted = () => {
-    setIsLeaveModalOpen(false);
+    handleCloseLeaveModal();
     onDataUpdate(); 
   };
 
@@ -87,22 +115,25 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
           <StatCard title="صافي الراتب" value={`${netSalary.toFixed(2)} ${CURRENCY}`} />
           <StatCard title="أيام الغياب" value={employee.absentDays || 0} />
           <StatCard title="ساعات العمل الإضافي" value={(employee.totalOvertime || 0).toFixed(1)} />
-           <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
-            <DialogTrigger asChild>
-                <Button className="h-full text-lg">
+           <Button className="h-full text-lg" onClick={handleOpenLeaveModal} disabled={leaveModalState.isLoading}>
+                {leaveModalState.isLoading ? (
+                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                ) : (
                     <FilePlus2 className="mr-2 h-6 w-6" />
-                    تقديم طلب إجازة
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                <DialogTitle>تقديم طلب إجازة</DialogTitle>
-                </DialogHeader>
-                <LeaveRequestForm onSubmitted={handleLeaveSubmitted} />
-            </DialogContent>
-            </Dialog>
+                )}
+                {leaveModalState.isLoading ? 'جارٍ التحميل...' : 'تقديم طلب إجازة'}
+            </Button>
         </CardContent>
       </Card>
+      
+      <Dialog open={leaveModalState.isOpen} onOpenChange={handleCloseLeaveModal}>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle>تقديم طلب إجازة</DialogTitle>
+            </DialogHeader>
+            <LeaveRequestForm onSubmitted={handleLeaveSubmitted} currentBalance={leaveModalState.balance} />
+        </DialogContent>
+      </Dialog>
       
       <Card>
         <CardHeader>

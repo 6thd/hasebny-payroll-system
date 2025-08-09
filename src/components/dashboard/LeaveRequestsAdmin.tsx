@@ -10,13 +10,24 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
-import { Check, X, Calendar as CalendarIcon, Edit, Briefcase } from 'lucide-react';
+import { Check, X, Calendar as CalendarIcon, Edit, Briefcase, ShieldAlert } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface LeaveRequest {
     id: string;
@@ -91,7 +102,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
     const handleConfirmApproval = async () => {
         if (!selectedRequest) return;
         setActionLoading(selectedRequest.id);
-        const result = await approveLeaveRequest(selectedRequest.id, newStartDate, newEndDate);
+        const result = await approveLeaveRequest(selectedRequest.id, false, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
             fetchRequests();
@@ -103,10 +114,10 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         setSelectedRequest(null);
         setActionLoading(null);
     };
-
-    const handleApproval = async (id: string) => {
+    
+    const handleApproval = async (id: string, override: boolean) => {
         setActionLoading(id);
-        const result = await approveLeaveRequest(id);
+        const result = await approveLeaveRequest(id, override);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
             fetchRequests();
@@ -167,9 +178,32 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                             {req.startDate.toDate().toLocaleDateString('ar-EG')} - {req.endDate.toDate().toLocaleDateString('ar-EG')}
                                         </TableCell>
                                         <TableCell className="text-center space-x-1 rtl:space-x-reverse">
-                                            <Button size="icon" variant="ghost" className="text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-full" onClick={() => handleApproval(req.id)} disabled={!!actionLoading}>
+                                            <Button size="icon" variant="ghost" className="text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-full" onClick={() => handleApproval(req.id, false)} disabled={!!actionLoading}>
                                                 {actionLoading === req.id ? <LoadingSpinner /> : <Check className="h-5 w-5" />}
                                             </Button>
+
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                     <Button size="icon" variant="ghost" className="text-yellow-600 hover:bg-yellow-100 dark:hover:bg-yellow-900 rounded-full" disabled={!!actionLoading}>
+                                                        <ShieldAlert className="h-5 w-5" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                    <AlertDialogTitle>تأكيد الموافقة مع التجاوز</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        هل أنت متأكد من رغبتك في الموافقة على هذا الطلب مع تجاوز فحص رصيد الإجازات؟ سيتم تسجيل الإجازة للموظف حتى لو كان رصيده غير كافٍ.
+                                                    </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleApproval(req.id, true)} className="bg-yellow-500 hover:bg-yellow-600">
+                                                        تأكيد الموافقة
+                                                    </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            
                                             <Button size="icon" variant="ghost" className="text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-full" onClick={() => handleOpenEditModal(req)} disabled={!!actionLoading}>
                                                 <Edit className="h-5 w-5" />
                                             </Button>
