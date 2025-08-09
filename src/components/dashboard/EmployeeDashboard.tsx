@@ -10,6 +10,7 @@ import type { Worker } from '@/types';
 import AttendanceTable from './AttendanceTable';
 import LeaveRequestForm from './LeaveRequestForm';
 import { FilePlus2 } from 'lucide-react';
+import EmployeeLeaveHistory from './EmployeeLeaveHistory';
 
 interface EmployeeDashboardProps {
   employee: Worker;
@@ -117,6 +118,8 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
           />
         </CardContent>
       </Card>
+
+      <EmployeeLeaveHistory employeeId={employee.id} />
     </div>
   );
 }
