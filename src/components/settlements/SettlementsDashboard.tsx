@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -37,16 +38,15 @@ export default function SettlementsDashboard() {
       setEosWorkers(activeWorkersForEos);
 
       // --- Fetch for Leave Settlement Tab ---
-      // 1. Get all employees regardless of status
       const allEmployeesSnapshot = await getDocs(collection(db, "employees"));
       const allWorkers = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       
-      // 2. Get approved leave requests
       const leaveRequestsQuery = query(
         collection(db, "leaveRequests"), 
         where("status", "==", "approved"),
         where("leaveType", "in", [...LEAVE_TYPES_FOR_SETTLEMENT])
       );
+      
       const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
       
       const approvedLeaveData: { [employeeId: string]: string } = {};
@@ -61,7 +61,6 @@ export default function SettlementsDashboard() {
       
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
-      // 3. Filter the *full* list of employees
       if (approvedEmployeeIds.length > 0) {
         const leaveWorkersToLoad = allWorkers
             .filter(worker => approvedEmployeeIds.includes(worker.id))
@@ -118,7 +117,7 @@ export default function SettlementsDashboard() {
           </CardHeader>
         </Card>
 
-        <Tabs defaultValue="leave" className="w-full">
+        <Tabs defaultValue="eos" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="leave">تصفية الإجازات السنوية</TabsTrigger>
             <TabsTrigger value="eos">تصفية نهاية الخدمة</TabsTrigger>
