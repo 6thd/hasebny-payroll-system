@@ -40,7 +40,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ScrollArea className="h-[50vh] border rounded-md">
+                 <ScrollArea className="h-[50vh] border rounded-md">
                     <Table>
                         <TableHeader className="sticky top-0 bg-background">
                             <TableRow>
@@ -51,7 +51,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {workers.length > 0 ? workers.map((worker) => (
+                            {workers && workers.length > 0 ? workers.map((worker) => (
                                 <TableRow key={worker.id}>
                                     <TableCell className="font-medium">{worker.name}</TableCell>
                                     <TableCell>{worker.employeeId || 'N/A'}</TableCell>
@@ -66,7 +66,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={4} className="h-24 text-center">
-                                       لا يوجد موظفون لديهم إجازات معتمدة حاليًا.
+                                       لا توجد طلبات إجازة معتمدة حاليًا.
                                     </TableCell>
                                 </TableRow>
                             )}

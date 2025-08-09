@@ -14,6 +14,8 @@ import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 
+const LEAVE_TYPES_FOR_SETTLEMENT = ["annual", "emergency"] as const;
+
 export default function SettlementsDashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -43,7 +45,7 @@ export default function SettlementsDashboard() {
       const leaveRequestsQuery = query(
         collection(db, "leaveRequests"), 
         where("status", "==", "approved"),
-        where("leaveType", "in", ["annual", "emergency"])
+        where("leaveType", "in", [...LEAVE_TYPES_FOR_SETTLEMENT])
       );
       const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
       
