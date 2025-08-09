@@ -10,11 +10,13 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Calculator } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
+import EndOfServiceModal from './EndOfServiceModal';
+
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -31,6 +33,8 @@ const initialFormState: Partial<Worker> = {
 export default function EmployeeManagementModal({ isOpen, onClose, workers, onDataUpdate }: EmployeeManagementModalProps) {
   const [formData, setFormData] = useState<Partial<Worker>>(initialFormState);
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedWorkerForEOS, setSelectedWorkerForEOS] = useState<Worker | null>(null);
+  const [isEOSModalOpen, setIsEOSModalOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -44,6 +48,18 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     setFormData(worker);
     setIsEditing(true);
   };
+  
+  const handleOpenEOSModal = (worker: Worker) => {
+    setSelectedWorkerForEOS(worker);
+    setIsEOSModalOpen(true);
+  };
+
+  const handleCloseEOSModal = () => {
+    setIsEOSModalOpen(false);
+    setSelectedWorkerForEOS(null);
+    onDataUpdate(); // Refetch data to show terminated status
+  };
+
 
   const navigateToSettlements = () => {
     router.push('/settlements');
@@ -109,9 +125,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
           <div className="md:col-span-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">قائمة الموظفين</h3>
-                <Button variant="link" onClick={navigateToSettlements}>
-                    مركز المستحقات
-                </Button>
             </div>
             <ScrollArea className="border rounded-lg p-2 flex-grow">
               {sortedWorkers.map(w => {
@@ -178,6 +191,14 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
         </div>
       </DialogContent>
     </Dialog>
+    {isEOSModalOpen && selectedWorkerForEOS && (
+        <EndOfServiceModal
+            isOpen={isEOSModalOpen}
+            onClose={handleCloseEOSModal}
+            worker={selectedWorkerForEOS}
+            onFinalized={handleCloseEOSModal}
+        />
+    )}
     </>
   );
 }
