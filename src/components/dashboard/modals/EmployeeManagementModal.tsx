@@ -77,12 +77,18 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
     const workerId = isEditing && formData.id ? formData.id : Date.now().toString();
     
-    const dataToSave: Partial<Worker> = { ...formData };
-    if (!isEditing) {
-      dataToSave.id = workerId;
+    const dataToSave: Partial<Worker> = { ...formData, id: workerId };
+    
+    if (isEditing) {
+        // If editing an existing employee, check if they are missing an employeeId
+        if (!dataToSave.employeeId) {
+            dataToSave.employeeId = `EMP${workerId.slice(-4)}`;
+        }
+    } else {
+      // For new employees
       dataToSave.employeeId = `EMP${workerId.slice(-4)}`;
       dataToSave.hireDate = new Date().toISOString().split('T')[0];
-      dataToSave.status = 'Active'; // Ensure status is set for new employees
+      dataToSave.status = 'Active';
       dataToSave.role = 'employee';
     }
     
