@@ -47,11 +47,15 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
         try {
             const q = query(
                 collection(db, 'leaveRequests'), 
-                where('employeeId', '==', employeeId),
-                orderBy('createdAt', 'desc')
+                where('employeeId', '==', employeeId)
+                // orderBy('createdAt', 'desc') // This requires a composite index. We will sort client-side instead.
             );
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+            
+            // Sort requests by creation date descending (newest first)
+            fetchedRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
             setRequests(fetchedRequests);
         } catch (error) {
             console.error("Error fetching leave history:", error);
