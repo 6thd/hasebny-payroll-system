@@ -4,6 +4,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, qu
 import { db } from '@/lib/firebase';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import { calculateLeaveBalance } from './leave-balance';
 
 const leaveRequestSchema = z.object({
   employeeId: z.string(),
@@ -60,8 +61,6 @@ async function createNotification(employeeId: string, message: string) {
   }
 }
 
-const ANNUAL_LEAVE_BALANCE = 30;
-
 export async function approveLeaveRequest(requestId: string, newStartDate?: Date, newEndDate?: Date) {
     try {
         const requestRef = doc(db, 'leaveRequests', requestId);
@@ -81,58 +80,30 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             return { success: false, error: 'تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء.' };
         }
 
-        // --- Start of Leave Balance Check ---
-        if (leaveType === 'annual') {
-            const employeeRef = doc(db, 'employees', employeeId);
-            const employeeSnap = await getDoc(employeeRef);
-            if (!employeeSnap.exists()) {
-                return { success: false, error: 'لم يتم العثور على بيانات الموظف.' };
-            }
-            const employeeData = employeeSnap.data();
-            const hireDate = employeeData.hireDate ? new Date(employeeData.hireDate) : new Date();
-            const currentDate = new Date();
+        // --- Start of Leave Balance Check (REVISED LOGIC) ---
+        if (leaveType === 'annual' || leaveType === 'emergency') {
+            const balanceResult = await calculateLeaveBalance({ employeeId });
             
-            let serviceYearStart = new Date(currentDate.getFullYear(), hireDate.getMonth(), hireDate.getDate());
-            if (currentDate < serviceYearStart) {
-                serviceYearStart.setFullYear(serviceYearStart.getFullYear() - 1);
+            if (!balanceResult.success) {
+                return { success: false, error: balanceResult.error };
             }
-            const serviceYearEnd = new Date(serviceYearStart.getFullYear() + 1, serviceYearStart.getMonth(), serviceYearStart.getDate());
 
-            // Simplified query to avoid composite index
-            const q = query(
-                collection(db, 'leaveRequests'),
-                where('employeeId', '==', employeeId),
-                where('status', '==', 'approved'),
-                where('leaveType', '==', 'annual')
-            );
-
-            const approvedLeavesSnap = await getDocs(q);
-            let daysTaken = 0;
-            approvedLeavesSnap.forEach(doc => {
-                const req = doc.data();
-                const reqStart = req.startDate.toDate();
-                // Filter by service year client-side
-                if (reqStart >= serviceYearStart && reqStart < serviceYearEnd) {
-                    const reqEnd = req.endDate.toDate();
-                    daysTaken += (reqEnd.getTime() - reqStart.getTime()) / (1000 * 3600 * 24) + 1;
-                }
-            });
-
+            const availableBalance = balanceResult.data.accruedDays;
             const newLeaveDuration = (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1;
 
-            if (daysTaken + newLeaveDuration > ANNUAL_LEAVE_BALANCE) {
+            if (newLeaveDuration > availableBalance) {
                  await updateDoc(requestRef, {
                     status: 'rejected',
                     reviewedAt: serverTimestamp(),
-                    notes: 'تم الرفض تلقائيًا لعدم وجود رصيد إجازات كافٍ.'
+                    notes: `تم الرفض تلقائيًا لعدم وجود رصيد إجازات كافٍ. الرصيد المتاح: ${availableBalance.toFixed(2)} يوم.`
                 });
                 await createNotification(
                     employeeId,
-                    'تم رفض طلب الإجازة الخاص بك لعدم كفاية الرصيد.'
+                    `تم رفض طلب الإجازة الخاص بك لعدم كفاية الرصيد. الرصيد المتاح: ${availableBalance.toFixed(2)} يوم.`
                 );
                 revalidatePath('/');
                 revalidatePath('/settlements');
-                return { success: false, error: 'رصيد الموظف غير كافٍ. تم رفض الطلب تلقائيًا.' };
+                return { success: false, error: `رصيد الموظف غير كافٍ (${availableBalance.toFixed(2)} يوم). تم رفض الطلب تلقائيًا.` };
             }
         }
         // --- End of Leave Balance Check ---
@@ -151,7 +122,7 @@ export async function approveLeaveRequest(requestId: string, newStartDate?: Date
             batch.set(attendanceDocRef, {
                 days: {
                     [day]: {
-                        status: leaveType === 'sick' ? 'sick_leave' : 'annual_leave'
+                        status: leaveType === 'sick' ? 'sick_leave' : leaveType === 'emergency' ? 'annual_leave' : 'annual_leave'
                     }
                 }
             }, { merge: true });
