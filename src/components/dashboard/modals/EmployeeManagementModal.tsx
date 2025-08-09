@@ -77,14 +77,17 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
     const workerId = isEditing && formData.id ? formData.id : Date.now().toString();
     
-    const dataToSave = { ...formData };
+    const dataToSave: Partial<Worker> = { ...formData };
     if (!isEditing) {
       dataToSave.id = workerId;
       dataToSave.employeeId = `EMP${workerId.slice(-4)}`;
       dataToSave.hireDate = new Date().toISOString().split('T')[0];
-      dataToSave.status = 'Active';
+      dataToSave.status = 'Active'; // Ensure status is set for new employees
+      dataToSave.role = 'employee';
     }
     
+    // This is an anti-pattern. We should not save UI-calculated fields back to the DB.
+    // Let's remove them before saving.
     const { days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
     
     try {
@@ -114,7 +117,12 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     { key: 'phone', label: 'هاتف' }, { key: 'food', label: 'طعام' },
   ];
   
-  const sortedWorkers = [...workers].sort((a, b) => (a.status === 'Terminated' ? 1 : -1));
+  const sortedWorkers = [...workers].sort((a, b) => {
+      if (a.status === 'Terminated' && b.status !== 'Terminated') return 1;
+      if (a.status !== 'Terminated' && b.status === 'Terminated') return -1;
+      return 0; // Or further sort by name if needed
+  });
+
 
   return (
     <>
