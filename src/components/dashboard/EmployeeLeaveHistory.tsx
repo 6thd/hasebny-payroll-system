@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,7 +55,6 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             
-            // Sort requests by creation date descending (newest first)
             fetchedRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
             setRequests(fetchedRequests);
@@ -75,6 +74,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
     }, [fetchRequests]);
 
     const formatDate = (timestamp: Timestamp) => {
+        if (!timestamp) return 'N/A';
         return format(timestamp.toDate(), 'P', { locale: arSA });
     };
 
