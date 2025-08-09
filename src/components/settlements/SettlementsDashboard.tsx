@@ -31,15 +31,14 @@ export default function SettlementsDashboard() {
       // 1. Fetch workers for End of Service tab (all non-terminated employees)
       const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
       const eosSnapshot = await getDocs(eosQuery);
-      const eosWorkersToLoad = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
-      setEosWorkers(eosWorkersToLoad);
+      const allActiveWorkers = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      setEosWorkers(allActiveWorkers);
 
       // 2. Fetch workers for Leave Settlement tab
-      // Fetch leave requests that are approved and are not 'sick' leave
       const leaveRequestsQuery = query(
         collection(db, "leaveRequests"), 
         where("status", "==", "approved"),
-        where("leaveType", "in", ["annual", "emergency"]) // Explicitly define types that count towards balance
+        where("leaveType", "in", ["annual", "emergency"])
       );
       const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
       
@@ -56,14 +55,13 @@ export default function SettlementsDashboard() {
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
       if (approvedEmployeeIds.length > 0) {
-        // Since firestore 'in' query supports max 10 elements, we might need to do multiple queries if many employees
-        const leaveWorkersQuery = query(collection(db, "employees"), where("id", "in", approvedEmployeeIds));
-        const leaveWorkersSnapshot = await getDocs(leaveWorkersQuery);
-        const leaveWorkersToLoad = leaveWorkersSnapshot.docs.map(doc => {
-            const workerData = { id: doc.id, ...doc.data() } as Worker;
-            workerData.lastApprovedLeaveDate = approvedLeaveData[workerData.id];
-            return workerData;
-        });
+        // Filter from the already fetched active workers list
+        const leaveWorkersToLoad = allActiveWorkers
+            .filter(worker => approvedEmployeeIds.includes(worker.id))
+            .map(worker => ({
+                ...worker,
+                lastApprovedLeaveDate: approvedLeaveData[worker.id]
+            }));
         setLeaveWorkers(leaveWorkersToLoad);
       } else {
         setLeaveWorkers([]);
