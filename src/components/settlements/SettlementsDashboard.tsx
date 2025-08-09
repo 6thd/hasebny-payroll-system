@@ -32,6 +32,8 @@ export default function SettlementsDashboard() {
       const eosQuery = query(collection(db, "employees"), where("status", "!=", "Terminated"));
       const eosSnapshot = await getDocs(eosQuery);
       const allActiveWorkers = eosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      
+      // FIX: Populate the eosWorkers state which is passed to the EosSettlementTab
       setEosWorkers(allActiveWorkers);
 
       // 2. Fetch workers for Leave Settlement tab
