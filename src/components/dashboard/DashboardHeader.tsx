@@ -84,10 +84,9 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                     </DropdownMenuItem>
                   </>
                 )}
-                 <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="ml-2 h-4 w-4" />
-                    تسجيل الخروج
-                 </DropdownMenuItem>
+                {!isAdmin && (
+                   <DropdownMenuItem disabled>لا توجد إجراءات متاحة</DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
              <div className="flex items-center gap-2">
@@ -118,8 +117,14 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-              {user.name || user.email}
+            <div className="flex items-center gap-2">
+                <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                {user.name || user.email}
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
+                    <LogOut className="h-5 w-5" />
+                    <span className="sr-only">تسجيل الخروج</span>
+                </Button>
             </div>
           </div>
         </div>
