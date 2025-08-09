@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 interface LeaveRequest {
@@ -202,7 +203,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                             className={cn("w-full justify-start text-left font-normal", !newStartDate && "text-muted-foreground")}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {newStartDate ? format(newStartDate, "PPP", { locale: require('date-fns/locale/ar-SA') }) : <span>اختر تاريخًا</span>}
+                                            {newStartDate ? format(newStartDate, "PPP", { locale: arSA }) : <span>اختر تاريخًا</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
@@ -219,7 +220,7 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
                                             className={cn("w-full justify-start text-left font-normal", !newEndDate && "text-muted-foreground")}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {newEndDate ? format(newEndDate, "PPP", { locale: require('date-fns/locale/ar-SA') }) : <span>اختر تاريخًا</span>}
+                                            {newEndDate ? format(newEndDate, "PPP", { locale: arSA }) : <span>اختر تاريخًا</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
