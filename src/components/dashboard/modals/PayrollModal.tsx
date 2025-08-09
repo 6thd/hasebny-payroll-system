@@ -192,7 +192,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                     <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
                     <TableCell className="space-x-2 rtl:space-x-reverse no-print">
                         <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>
-                        {payrolls[worker.id] && <PredictiveAnalysis worker={worker} payroll={payrolls[worker.id]} />}
+                        {payrolls[worker.id] && <PredictiveAnalysis worker={worker} currentYear={year} currentMonth={month} />}
                     </TableCell>
                     </TableRow>
                 ))}
