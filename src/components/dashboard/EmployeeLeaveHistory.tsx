@@ -111,7 +111,7 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
                                         <TableCell>{formatDate(req.startDate)}</TableCell>
                                         <TableCell>{formatDate(req.endDate)}</TableCell>
                                         <TableCell>
-                                            <Badge variant={statusMap[req.status]?.variant || 'default'}>
+                                            <Badge variant={statusMap[req.status]?.variant || 'secondary'}>
                                                 {statusMap[req.status]?.label || req.status}
                                             </Badge>
                                         </TableCell>
