@@ -18,8 +18,9 @@ export function calculatePayroll(worker: Worker | null, year: number, month: num
   const hourlyRate = dailyRate / REGULAR_HOURS_PER_DAY;
 
   const overtimePay = (worker.totalOvertime || 0) * hourlyRate * 1.5;
-  // Only deduct for days explicitly marked as 'absent'
-  const absenceDeduction = (worker.absentDays || 0) * dailyRate;
+  // Combine deductions for all non-working, unpaid days
+  const absenceAndLeaveDays = (worker.absentDays || 0) + (worker.annualLeaveDays || 0) + (worker.sickLeaveDays || 0);
+  const absenceDeduction = absenceAndLeaveDays * dailyRate;
   
   const totalAllowances = (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0) + (worker.commission || 0);
   const totalDeductions = (worker.advances || 0) + (worker.penalties || 0) + absenceDeduction;
@@ -31,24 +32,36 @@ export function calculatePayroll(worker: Worker | null, year: number, month: num
 }
 
 export function processWorkerData(worker: Worker, year: number, month: number): Worker {
-  if (!worker || typeof worker.days === 'undefined') return { ...worker, totalRegular: 0, totalOvertime: 0, absentDays: 0 };
+  if (!worker || typeof worker.days === 'undefined') {
+    return { ...worker, totalRegular: 0, totalOvertime: 0, absentDays: 0, annualLeaveDays: 0, sickLeaveDays: 0 };
+  }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  let totalRegular = 0, totalOvertime = 0, absentDays = 0;
+  let totalRegular = 0, totalOvertime = 0, absentDays = 0, annualLeaveDays = 0, sickLeaveDays = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dayData = worker.days[day];
     if (dayData) {
-      if (dayData.status === 'present') {
-        totalRegular += dayData.regularHours || 0;
-        totalOvertime += dayData.overtimeHours || 0;
-      } else if (dayData.status === 'absent') {
-        absentDays++;
+      switch (dayData.status) {
+        case 'present':
+          totalRegular += dayData.regularHours || 0;
+          totalOvertime += dayData.overtimeHours || 0;
+          break;
+        case 'absent':
+          absentDays++;
+          break;
+        case 'annual_leave':
+          annualLeaveDays++;
+          break;
+        case 'sick_leave':
+          sickLeaveDays++;
+          break;
+        default:
+          break;
       }
-      // Note: 'annual_leave' and 'sick_leave' are not counted as absent.
     }
   }
-  return { ...worker, totalRegular, totalOvertime, absentDays };
+  return { ...worker, totalRegular, totalOvertime, absentDays, annualLeaveDays, sickLeaveDays };
 }
 
 export function getFridaysInMonth(year: number, month: number): number[] {
