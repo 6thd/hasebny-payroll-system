@@ -12,24 +12,40 @@ export function calculatePayroll(worker: Worker | null, year: number, month: num
   if (!worker) {
     return { overtimePay: 0, absenceDeduction: 0, netSalary: 0, totalAllowances: 0, grossSalary: 0, totalDeductions: 0 };
   }
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const dailyRate = (worker.basicSalary || 0) / daysInMonth;
-  const hourlyRate = dailyRate / REGULAR_HOURS_PER_DAY;
-
-  const overtimePay = (worker.totalOvertime || 0) * hourlyRate * 1.5;
-  // Combine deductions for all non-working, unpaid days
-  const absenceAndLeaveDays = (worker.absentDays || 0) + (worker.annualLeaveDays || 0) + (worker.sickLeaveDays || 0);
-  const absenceDeduction = absenceAndLeaveDays * dailyRate;
   
+  // 1. حساب إجمالي الاستحقاقات (بدون العمل الإضافي) ليكون أساس الخصم
   const totalAllowances = (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0) + (worker.commission || 0);
-  const totalDeductions = (worker.advances || 0) + (worker.penalties || 0) + absenceDeduction;
+  const deductibleGrossSalary = (worker.basicSalary || 0) + totalAllowances;
   
-  const grossSalary = (worker.basicSalary || 0) + totalAllowances + overtimePay;
-  const netSalary = grossSalary - totalDeductions;
+  // 2. حساب معدل الأجر اليومي
+  //    (يتم القسمة على 30 دائماً حسب المتبع في أنظمة الرواتب السعودية)
+  const dailyRate = deductibleGrossSalary / 30;
+  
+  // 3. حساب قيمة خصم الغياب والإجازات
+  const hourlyRate = ((worker.basicSalary || 0) / 30) / REGULAR_HOURS_PER_DAY; // أجر الإضافي يحسب على الأساسي فقط
+  const overtimePay = (worker.totalOvertime || 0) * hourlyRate * 1.5;
+  const absenceAndLeaveDays = (worker.absentDays || 0) + (worker.annualLeaveDays || 0) + (worker.sickLeaveDays || 0);
+  const absenceDeduction = dailyRate * absenceAndLeaveDays;
 
-  return { overtimePay, absenceDeduction, netSalary, totalAllowances, grossSalary, totalDeductions };
+  // 4. حساب إجمالي الاستحقاقات
+  const grossSalary = deductibleGrossSalary + overtimePay;
+
+  // 5. حساب إجمالي الاستقطاعات
+  const totalDeductions = absenceDeduction + (worker.advances || 0) + (worker.penalties || 0);
+  
+  // 6. حساب صافي الراتب
+  const netSalary = grossSalary - totalDeductions;
+  
+  return { 
+      overtimePay: parseFloat(overtimePay.toFixed(2)),
+      absenceDeduction: parseFloat(absenceDeduction.toFixed(2)),
+      netSalary: parseFloat(netSalary.toFixed(2)),
+      totalAllowances: parseFloat(totalAllowances.toFixed(2)),
+      grossSalary: parseFloat(grossSalary.toFixed(2)),
+      totalDeductions: parseFloat(totalDeductions.toFixed(2)),
+  };
 }
+
 
 export function processWorkerData(worker: Worker, year: number, month: number): Worker {
   if (!worker || typeof worker.days === 'undefined') {
