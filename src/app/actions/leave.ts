@@ -1,3 +1,4 @@
+
 'use server';
 
 import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, where, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
@@ -220,7 +221,7 @@ export async function settleLeaveBalance(input: z.infer<typeof SettleLeaveBalanc
         batch.set(historyRef, {
             type: 'LeaveSettlement',
             settlementDate,
-            settledAt: serverTimestamp(),
+            finalizedAt: serverTimestamp(),
             ...results,
         });
 

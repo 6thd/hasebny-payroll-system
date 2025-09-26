@@ -1,3 +1,4 @@
+
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -133,4 +134,16 @@ export interface EndOfServiceResult {
     finalGratuity: number;
     leaveBalanceValue: number;
     totalAmount: number;
+}
+
+export interface ServiceHistoryItem {
+  id: string;
+  type: 'EndOfService' | 'LeaveSettlement';
+  finalizedAt: Timestamp;
+  employeeId: string;
+  employeeName: string;
+  // Could have properties from either settlement type
+  totalAmount?: number; // From EOS
+  monetaryValue?: number; // From Leave
+  [key: string]: any; // To allow for other properties
 }

@@ -2,15 +2,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import type { Worker } from '@/types';
+import type { Worker, ServiceHistoryItem } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LeaveSettlementTab from './LeaveSettlementTab';
 import EosSettlementTab from './EosSettlementTab';
+import SettlementHistoryTab from './SettlementHistoryTab';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function SettlementsDashboard() {
   const router = useRouter();
   const [eosWorkers, setEosWorkers] = useState<Worker[]>([]);
   const [leaveWorkers, setLeaveWorkers] = useState<Worker[]>([]);
+  const [history, setHistory] = useState<ServiceHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -32,10 +34,8 @@ export default function SettlementsDashboard() {
     setLoading(true);
     try {
       // --- Fetch for End of Service Tab ---
-      const eosSnapshot = await getDocs(collection(db, "employees"));
-      const activeWorkersForEos = eosSnapshot.docs
-        .map(d => ({ id: d.id, ...d.data() } as Worker))
-        .filter(w => (w.status ?? "Active") !== "Terminated");
+      const eosSnapshot = await getDocs(query(collection(db, "employees"), where("status", "!=", "Terminated")));
+      const activeWorkersForEos = eosSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Worker));
       setEosWorkers(activeWorkersForEos);
 
       // --- Fetch for Leave Settlement Tab ---
@@ -64,7 +64,7 @@ export default function SettlementsDashboard() {
 
       if (approvedEmployeeIds.length > 0) {
         const leaveWorkersToLoad = allWorkers
-            .filter(worker => approvedEmployeeIds.includes(worker.id))
+            .filter(worker => approvedEmployeeIds.includes(worker.id) && worker.status !== 'Terminated')
             .map(worker => ({
                 ...worker,
                 lastApprovedLeaveDate: approvedLeaveData[worker.id]
@@ -73,6 +73,25 @@ export default function SettlementsDashboard() {
       } else {
         setLeaveWorkers([]);
       }
+      
+      // --- Fetch for History Tab ---
+        const historyQuery = query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc'));
+        const historySnapshot = await getDocs(historyQuery);
+        const employeeNames: { [id: string]: string } = {};
+        allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
+
+        const historyItems = historySnapshot.docs.map(doc => {
+            const data = doc.data();
+            const employeeId = doc.ref.parent.parent?.id || '';
+            return {
+                ...data,
+                id: doc.id,
+                employeeId: employeeId,
+                employeeName: employeeNames[employeeId] || 'موظف غير معروف',
+            } as ServiceHistoryItem;
+        });
+      setHistory(historyItems);
+
 
     } catch (error) {
       console.error("Error fetching workers: ", error);
@@ -107,7 +126,7 @@ export default function SettlementsDashboard() {
                 <div>
                     <CardTitle className="text-2xl">مركز تصفية المستحقات</CardTitle>
                     <CardDescription>
-                    قم بإدارة وتصفية مستحقات الموظفين من إجازات سنوية أو إنهاء خدمة من هنا.
+                    قم بإدارة وتصفية مستحقات الموظفين ومراجعة السجل التاريخي للعمليات.
                     </CardDescription>
                 </div>
                 <Button onClick={() => router.push('/')}>
@@ -118,11 +137,15 @@ export default function SettlementsDashboard() {
           </CardHeader>
         </Card>
 
-        <Tabs defaultValue="eos" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="history" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="history">سجل التسويات</TabsTrigger>
             <TabsTrigger value="leave">تصفية الإجازات السنوية</TabsTrigger>
             <TabsTrigger value="eos">تصفية نهاية الخدمة</TabsTrigger>
           </TabsList>
+           <TabsContent value="history">
+            <SettlementHistoryTab historyItems={history} />
+          </TabsContent>
           <TabsContent value="leave">
             <LeaveSettlementTab workers={leaveWorkers} onAction={fetchData} />
           </TabsContent>
