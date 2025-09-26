@@ -56,11 +56,11 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
   const CURRENCY = 'ريال';
   
   const handleOpenLeaveModal = async () => {
-      setLeaveModalState({ ...leaveModalState, isLoading: true });
+      setLeaveModalState({ isOpen: true, isLoading: true, balance: null });
       try {
           const result = await calculateLeaveBalance({ employeeId: employee.id });
           if (result.success) {
-              setLeaveModalState({ isOpen: true, isLoading: false, balance: result.data.accruedDays });
+              setLeaveModalState(prevState => ({ ...prevState, isLoading: false, balance: result.data.accruedDays }));
           } else {
               toast({ title: "خطأ", description: result.error, variant: "destructive" });
               setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
