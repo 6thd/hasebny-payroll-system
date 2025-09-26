@@ -52,10 +52,10 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
         recomputePayrolls(workersWithMonthlyData);
     };
 
-    if (initialWorkers.length > 0) {
+    if (initialWorkers.length > 0 && isOpen) {
         fetchMonthlyData();
     }
-  }, [initialWorkers, year, month]);
+  }, [initialWorkers, year, month, isOpen]);
 
 
   const recomputePayrolls = (currentWorkers: Worker[]) => {
@@ -75,26 +75,23 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
   };
 
   const handleSave = async (worker: Worker) => {
-    const { id, days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...permanentWorkerData } = worker;
+    const { id, days, totalRegular, totalOvertime, absentDays, sickLeaveDays, annualLeaveDays, ...permanentWorkerData } = worker;
     
     // Data that is specific to the month
     const monthlyData: MonthlyData = {
-        commission: commission || 0,
-        advances: advances || 0,
-        penalties: penalties || 0,
+        commission: worker.commission || 0,
+        advances: worker.advances || 0,
+        penalties: worker.penalties || 0,
     };
 
     try {
-      // Save permanent data to the 'employees' collection
-      await setDoc(doc(db, 'employees', worker.id), permanentWorkerData, { merge: true });
-
       // Save monthly data to the specific salary collection for that month
       const salaryCollectionName = `salaries_${year}_${month + 1}`;
       await setDoc(doc(db, salaryCollectionName, worker.id), monthlyData);
 
-      toast({ title: `تم حفظ بيانات ${worker.name}` });
+      toast({ title: `تم حفظ بيانات ${worker.name} الشهرية` });
     } catch (error) {
-      toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات الشهرية', variant: 'destructive' });
       console.error("Error saving payroll data: ", error);
     }
   };
@@ -143,7 +140,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
         <DialogHeader className="no-print flex-shrink-0">
           <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
-            يمكنك تعديل القيم المالية للموظفين هنا. سيتم إعادة حساب القيم المشتقة تلقائياً. البيانات المتغيرة (عمولة, سلف, جزاءات) تحفظ للشهر الحالي فقط.
+            هنا يمكنك إدخال البيانات المالية المتغيرة شهرياً. لحفظ التغييرات اضغط على زر "حفظ" لكل موظف.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0 overflow-auto">
@@ -169,10 +166,10 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 {workers.map(worker => (
                     <TableRow key={worker.id}>
                     <TableCell className="font-semibold sticky rtl:right-0 ltr:left-0 bg-background z-10">{worker.name}</TableCell>
-                    {/* Permanent financial fields */}
+                    {/* Permanent financial fields are read-only now */}
                     {financialFields.map(f => (
                         <TableCell key={f.key}>
-                        <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
+                            {(worker[f.key] as number || 0).toFixed(2)}
                         </TableCell>
                     ))}
                     {/* Monthly financial fields */}

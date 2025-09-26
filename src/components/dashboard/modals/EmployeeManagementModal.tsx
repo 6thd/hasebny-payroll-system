@@ -92,9 +92,8 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
       dataToSave.role = 'employee';
     }
     
-    // This is an anti-pattern. We should not save UI-calculated fields back to the DB.
-    // Let's remove them before saving.
-    const { days, totalRegular, totalOvertime, absentDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
+    // These are UI-calculated or monthly fields, so we remove them before saving to the main document.
+    const { days, totalRegular, totalOvertime, absentDays, sickLeaveDays, annualLeaveDays, commission, advances, penalties, ...employeeDataToSave } = dataToSave;
     
     try {
       await setDoc(doc(db, 'employees', workerId), employeeDataToSave, { merge: true });
@@ -126,7 +125,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
   const sortedWorkers = [...workers].sort((a, b) => {
       if (a.status === 'Terminated' && b.status !== 'Terminated') return 1;
       if (a.status !== 'Terminated' && b.status === 'Terminated') return -1;
-      return 0; // Or further sort by name if needed
+      return a.name.localeCompare(b.name);
   });
 
 

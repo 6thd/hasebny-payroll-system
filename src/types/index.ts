@@ -34,9 +34,9 @@ export interface Worker {
   phone: number;
   food: number;
   // These are now monthly and will be populated from a separate collection
-  commission: number;
-  advances: number;
-  penalties: number;
+  commission?: number;
+  advances?: number;
+  penalties?: number;
   days: { [day: number]: DayData };
   totalRegular?: number;
   totalOvertime?: number;
