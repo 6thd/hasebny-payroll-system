@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { AppUser, Worker } from '@/types';
 import { MONTHS } from '@/lib/utils';
-import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown, Landmark } from 'lucide-react';
+import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown, Landmark, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu';
 
 interface DashboardHeaderProps {
   user: AppUser;
@@ -68,7 +68,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                {isAdmin && (
+                {isAdmin ? (
                   <>
                     <DropdownMenuItem onClick={() => setPayrollModalOpen(true)}>
                       <CircleDollarSign className="ml-2 h-4 w-4" />
@@ -83,9 +83,11 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                         مركز تصفية المستحقات
                     </DropdownMenuItem>
                   </>
-                )}
-                {!isAdmin && (
-                   <DropdownMenuItem disabled>لا توجد إجراءات متاحة</DropdownMenuItem>
+                ) : (
+                   <DropdownMenuItem onClick={() => router.push('/profile')}>
+                        <UserIcon className="ml-2 h-4 w-4" />
+                        ملفي الشخصي
+                    </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -118,13 +120,27 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
               </Select>
             </div>
             <div className="flex items-center gap-2">
-                <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                {user.name || user.email}
-                </div>
-                <Button variant="ghost" size="icon" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-                    <LogOut className="h-5 w-5" />
-                    <span className="sr-only">تسجيل الخروج</span>
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="px-3 py-1.5 h-auto">
+                            <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {user.name || user.email}
+                            </div>
+                            <ChevronDown className="mr-2 h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                         <DropdownMenuItem onClick={() => router.push('/profile')}>
+                            <UserIcon className="ml-2 h-4 w-4" />
+                            <span>ملفي الشخصي</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="ml-2 h-4 w-4" />
+                            <span>تسجيل الخروج</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
           </div>
         </div>
