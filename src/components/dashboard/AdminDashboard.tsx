@@ -22,7 +22,7 @@ export default function AdminDashboard({
   return (
     <div className="mt-6">
       {activeView === 'analytics' ? (
-        <AdminAnalytics />
+        <AdminAnalytics workers={workers} isAdmin={isAdmin} />
       ) : (
         <div className="bg-card p-4 rounded-xl shadow-lg">
           <AttendanceTable

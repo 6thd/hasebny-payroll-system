@@ -1,10 +1,16 @@
+import { Worker } from '@/types';
 import AnalyticsCharts from "./AnalyticsCharts";
 import AnalyticsKPIs from "./AnalyticsKPIs";
 import EmployeesOnLeave from "./EmployeesOnLeave";
 import LeaveRequestsAdmin from "./LeaveRequestsAdmin";
+import AlertsManager from "./AlertsManager";
 
+interface AdminAnalyticsProps {
+  workers?: Worker[];
+  isAdmin?: boolean;
+}
 
-export default function AdminAnalytics() {
+export default function AdminAnalytics({ workers = [], isAdmin = true }: AdminAnalyticsProps) {
     
     const handleAction = () => {
         // This is a dummy handler for now, can be used to trigger data refetch
@@ -14,6 +20,7 @@ export default function AdminAnalytics() {
 
     return (
         <div className="space-y-8">
+            <AlertsManager workers={workers} isAdmin={isAdmin} />
             <AnalyticsKPIs />
             <AnalyticsCharts />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
