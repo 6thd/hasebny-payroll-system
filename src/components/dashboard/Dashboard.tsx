@@ -82,11 +82,11 @@ export default function Dashboard() {
     setDate(newDate);
   };
 
-  const handleDataUpdate = () => {
+  const handleDataUpdate = useCallback(() => {
     fetchData();
     // This custom event helps other components (like charts) know when to refetch data
     window.dispatchEvent(new CustomEvent('data-updated'));
-  };
+  }, [fetchData]);
 
   if (loading || !user) {
     return <LoadingSpinner fullScreen />;
