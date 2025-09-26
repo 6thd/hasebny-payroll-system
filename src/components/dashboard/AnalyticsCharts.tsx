@@ -12,9 +12,9 @@ import LoadingSpinner from '../LoadingSpinner';
 
 const COLORS = {
   present: 'hsl(var(--primary))',
-  on_leave: 'hsl(197, 71%, 65%)',
-  absent: 'hsl(0, 72%, 67%)',
-  weekend: 'hsl(240, 5%, 80%)',
+  on_leave: 'hsl(var(--chart-2))',
+  absent: 'hsl(var(--destructive))',
+  weekend: 'hsl(var(--muted))',
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
