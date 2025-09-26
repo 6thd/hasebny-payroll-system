@@ -8,9 +8,8 @@ import type { Worker, MonthlyData } from '@/types';
 import { processWorkerData } from '@/lib/utils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
-import AttendanceTable from './AttendanceTable';
 import EmployeeDashboard from './EmployeeDashboard';
-import AdminAnalytics from './AdminAnalytics';
+import AdminDashboard from './AdminDashboard';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -109,21 +108,13 @@ export default function Dashboard() {
         />
 
         {isAdmin ? (
-          <div className="mt-6">
-            {activeView === 'analytics' ? (
-              <AdminAnalytics />
-            ) : (
-              <div className="bg-card p-4 rounded-xl shadow-lg">
-                  <AttendanceTable
-                    workers={workers}
-                    year={date.year}
-                    month={date.month}
-                    isAdmin={isAdmin}
-                    onDataUpdate={handleDataUpdate}
-                  />
-              </div>
-            )}
-          </div>
+          <AdminDashboard
+            workers={workers}
+            date={date}
+            isAdmin={isAdmin}
+            onDataUpdate={handleDataUpdate}
+            activeView={activeView}
+          />
         ) : (
           <EmployeeDashboard 
             employee={workers[0]}
