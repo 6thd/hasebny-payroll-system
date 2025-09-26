@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import EndOfServiceModal from './EndOfServiceModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface EmployeeManagementModalProps {
@@ -199,6 +200,22 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                     <Label>الرقم الوظيفي</Label>
                     <Input name="employeeId" value={(formData as any).employeeId || ''} onChange={handleInputChange} disabled />
                      <p className="text-xs text-muted-foreground mt-1">يتم إنشاء الرقم الوظيفي تلقائياً.</p>
+                  </div>
+                  <div>
+                    <Label>الصلاحية</Label>
+                    <Select
+                        name="role"
+                        value={formData.role || 'employee'}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as 'admin' | 'employee' }))}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="اختر الصلاحية" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="admin">مدير</SelectItem>
+                            <SelectItem value="employee">موظف</SelectItem>
+                        </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <h4 className="font-semibold pt-4 border-t">البيانات المالية الثابتة</h4>
