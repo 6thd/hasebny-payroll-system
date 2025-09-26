@@ -1,9 +1,11 @@
+
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { useState } from 'react';
+import { collection, query, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestoreListener } from '@/hooks/use-firestore-listener';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,8 +56,6 @@ interface LeaveRequestsAdminProps {
 }
 
 export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveRequestsAdminProps) {
-    const [requests, setRequests] = useState<LeaveRequest[]>([]);
-    const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
@@ -63,34 +63,17 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
     const [newEndDate, setNewEndDate] = useState<Date | undefined>();
     const { toast } = useToast();
 
-    const fetchRequests = useCallback(async () => {
-        setLoading(true);
-        try {
-            const q = query(collection(db, 'leaveRequests'));
-            const querySnapshot = await getDocs(q);
-
-            const allRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-            
-            const pendingRequests = allRequests
+    const { data: requests, loading } = useFirestoreListener<LeaveRequest>({
+        query: query(collection(db, 'leaveRequests')),
+        onFetch: (allRequests) => {
+            return allRequests
                 .filter(req => req.status === 'pending')
                 .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
                 .slice(0, itemCount);
+        },
+        dependencies: [itemCount]
+    });
 
-            setRequests(pendingRequests);
-        } catch (error) {
-            console.error("Error fetching leave requests:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من جلب طلبات الإجازة.", variant: "destructive" });
-        } finally {
-            setLoading(false);
-        }
-    }, [toast, itemCount]);
-
-    useEffect(() => {
-        const handleDataUpdate = () => fetchRequests();
-        fetchRequests();
-        window.addEventListener('data-updated', handleDataUpdate);
-        return () => window.removeEventListener('data-updated', handleDataUpdate);
-    }, [fetchRequests]);
 
     const handleOpenEditModal = (req: LeaveRequest) => {
         setSelectedRequest(req);
@@ -105,7 +88,6 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         const result = await approveLeaveRequest(selectedRequest.id, false, newStartDate, newEndDate);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
-            fetchRequests();
             onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
@@ -120,7 +102,6 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         const result = await approveLeaveRequest(id, override);
         if (result.success) {
             toast({ title: "تمت الموافقة", description: "تمت الموافقة على طلب الإجازة." });
-            fetchRequests();
             onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
@@ -133,7 +114,6 @@ export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveReq
         const result = await rejectLeaveRequest(id);
         if (result.success) {
             toast({ title: "تم الرفض", description: "تم رفض طلب الإجازة." });
-            fetchRequests();
             onAction?.();
         } else {
             toast({ title: "خطأ", description: result.error, variant: "destructive" });
