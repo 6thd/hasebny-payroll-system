@@ -150,7 +150,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                 <TableRow>
                     <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
                     <TableHead colSpan={financialFields.length + monthlyFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
-                    <TableHead colSpan={deductionFields.length + 1} className="text-center text-red-600">الاستقطاعات</TableHead>
+                    <TableHead colSpan={deductionFields.length + 1} className="text-center text-destructive">الاستقطاعات</TableHead>
                     <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
                     <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
                 </TableRow>
@@ -185,7 +185,7 @@ export default function PayrollModal({ isOpen, onClose, workers: initialWorkers,
                         <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
                         </TableCell>
                     ))}
-                    <TableCell className="text-red-600">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
+                    <TableCell className="text-destructive">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
                     <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
                     <TableCell className="space-x-2 rtl:space-x-reverse no-print">
                         <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>

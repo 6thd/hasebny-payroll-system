@@ -87,7 +87,7 @@ export default function AttendanceTable({ workers, year, month, isAdmin, onDataU
                   <TableCell className="font-bold sticky rtl:right-0 ltr:left-0 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-gray-800 z-10">{worker.name}</TableCell>
                   <TableCell className="font-medium text-green-700 dark:text-green-400 text-center">{(worker.totalRegular || 0).toFixed(1)}</TableCell>
                   <TableCell className="font-medium text-sky-700 dark:text-sky-400 text-center">{(worker.totalOvertime || 0).toFixed(1)}</TableCell>
-                  <TableCell className="font-medium text-red-700 dark:text-red-400 text-center">{worker.absentDays || 0}</TableCell>
+                  <TableCell className="font-medium text-destructive text-center">{worker.absentDays || 0}</TableCell>
                   <TableCell className="font-bold text-primary text-center">{netSalary.toFixed(2)} {CURRENCY}</TableCell>
                   {daysArray.map(day => {
                     const dayData = worker.days?.[day];

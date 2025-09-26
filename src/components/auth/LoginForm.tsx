@@ -72,13 +72,13 @@ export default function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition duration-300 shadow-lg" disabled={loading}>
+        <Button type="submit" className="w-full p-3 rounded-lg font-bold transition duration-300 shadow-lg" disabled={loading}>
           {loading ? "جارِ تسجيل الدخول..." : "تسجيل الدخول"}
         </Button>
-        {error && <p className="text-red-400 text-sm text-center h-4">{error}</p>}
+        {error && <p className="text-destructive text-sm text-center h-4">{error}</p>}
       </form>
       <p className="text-center text-sm text-white/70 mt-6">
-        ليس لديك حساب؟ <Link href="/signup" className="font-bold text-blue-400 hover:underline">سجل الآن</Link>
+        ليس لديك حساب؟ <Link href="/signup" className="font-bold text-primary hover:underline">سجل الآن</Link>
       </p>
     </div>
   );

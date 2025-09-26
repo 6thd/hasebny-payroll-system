@@ -109,13 +109,13 @@ export default function SignupForm() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 transition duration-300 shadow-lg" disabled={loading}>
+        <Button type="submit" className="w-full bg-primary text-white p-3 rounded-lg font-bold hover:bg-primary/90 transition duration-300 shadow-lg" disabled={loading}>
           {loading ? "جارِ إنشاء الحساب..." : "إنشاء حساب"}
         </Button>
-        {error && <p className="text-red-400 text-sm text-center h-4">{error}</p>}
+        {error && <p className="text-destructive text-sm text-center h-4">{error}</p>}
       </form>
       <p className="text-center text-sm text-white/70 mt-6">
-        لديك حساب بالفعل؟ <Link href="/login" className="font-bold text-blue-400 hover:underline">سجل الدخول</Link>
+        لديك حساب بالفعل؟ <Link href="/login" className="font-bold text-primary hover:underline">سجل الدخول</Link>
       </p>
     </div>
   );
