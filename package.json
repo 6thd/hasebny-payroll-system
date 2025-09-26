@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "upload": "git init -b main && git add . && git commit -m \"Initial commit of Hasebny Payroll System\" && git remote add origin https://github.com/6thd/hasebny-payroll-system.git && git push -u origin main"
+    "upload": "git branch -m master main && git add . && git commit -m \"Initial commit of Hasebny Payroll System\" && git remote set-url origin https://github.com/6thd/hasebny-payroll-system.git && git push -u origin main"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
