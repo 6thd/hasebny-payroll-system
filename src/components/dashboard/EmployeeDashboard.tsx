@@ -8,11 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { MONTHS, calculatePayroll } from '@/lib/utils';
 import type { Worker } from '@/types';
 import AttendanceTable from './AttendanceTable';
-import LeaveRequestForm from './LeaveRequestForm';
+import LeaveRequestForm, { type LeaveRequestFormValues } from './LeaveRequestForm';
 import { FilePlus2, Loader2 } from 'lucide-react';
 import EmployeeLeaveHistory from './EmployeeLeaveHistory';
 import { calculateLeaveBalance } from '@/app/actions/leave-balance';
+import { submitLeaveRequest } from '@/app/actions/leave';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 interface EmployeeDashboardProps {
   employee: Worker;
@@ -41,7 +43,9 @@ interface LeaveModalState {
 
 export default function EmployeeDashboard({ employee, year, month, onDateChange, onDataUpdate }: EmployeeDashboardProps) {
   const [leaveModalState, setLeaveModalState] = useState<LeaveModalState>({ isOpen: false, isLoading: false, balance: null });
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   
   if (!employee) {
     return <div className="text-center text-red-500">لا يمكن تحميل بيانات الموظف.</div>;
@@ -70,10 +74,40 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
   const handleCloseLeaveModal = () => {
     setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
   };
-  
-  const handleLeaveSubmitted = () => {
-    handleCloseLeaveModal();
-    onDataUpdate(); 
+
+  const handleLeaveSubmit = async (data: LeaveRequestFormValues) => {
+    if (!user) {
+      toast({ title: "خطأ", description: "يجب أن تكون مسجلاً لتقديم طلب.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingLeave(true);
+    const result = await submitLeaveRequest({
+      ...data,
+      employeeId: user.id,
+      employeeName: user.name || user.email || 'غير معروف',
+    });
+    setIsSubmittingLeave(false);
+
+    if (result.success) {
+      toast({
+        title: "تم إرسال الطلب",
+        description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
+      });
+      handleCloseLeaveModal();
+      onDataUpdate();
+    } else {
+      console.error("Error submitting leave request: ", result.error);
+      const errorMessage = typeof result.error === 'string' 
+        ? result.error
+        : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.";
+      
+      toast({
+        title: "خطأ",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
 
@@ -131,7 +165,11 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
             <DialogHeader>
             <DialogTitle>تقديم طلب إجازة</DialogTitle>
             </DialogHeader>
-            <LeaveRequestForm onSubmitted={handleLeaveSubmitted} currentBalance={leaveModalState.balance} />
+            <LeaveRequestForm 
+              onSubmit={handleLeaveSubmit}
+              isSubmitting={isSubmittingLeave} 
+              currentBalance={leaveModalState.balance} 
+            />
         </DialogContent>
       </Dialog>
       

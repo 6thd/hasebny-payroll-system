@@ -5,10 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Info } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { CalendarIcon, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { submitLeaveRequest } from "@/app/actions/leave";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,8 +31,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import LoadingSpinner from "../LoadingSpinner";
-import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
 const leaveRequestSchema = z.object({
@@ -53,18 +49,15 @@ const leaveRequestSchema = z.object({
   path: ["endDate"],
 });
 
-type LeaveRequestFormValues = z.infer<typeof leaveRequestSchema>;
+export type LeaveRequestFormValues = z.infer<typeof leaveRequestSchema>;
 
 interface LeaveRequestFormProps {
-  onSubmitted?: () => void;
+  onSubmit: (data: LeaveRequestFormValues) => void;
+  isSubmitting: boolean;
   currentBalance: number | null;
 }
 
-export default function LeaveRequestForm({ onSubmitted, currentBalance }: LeaveRequestFormProps) {
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth(); // Get current user
-  
+export default function LeaveRequestForm({ onSubmit, isSubmitting, currentBalance }: LeaveRequestFormProps) {
   const form = useForm<LeaveRequestFormValues>({
     resolver: zodResolver(leaveRequestSchema),
     defaultValues: {
@@ -72,39 +65,9 @@ export default function LeaveRequestForm({ onSubmitted, currentBalance }: LeaveR
     }
   });
 
-  const onSubmit = async (data: LeaveRequestFormValues) => {
-    if (!user) {
-      toast({ title: "خطأ", description: "يجب أن تكون مسجلاً لتقديم طلب.", variant: "destructive" });
-      return;
-    }
-
-    setLoading(true);
-    const result = await submitLeaveRequest({
-      ...data,
-      employeeId: user.id,
-      employeeName: user.name || user.email || 'غير معروف',
-    });
-    setLoading(false);
-
-    if (result.success) {
-      toast({
-        title: "تم إرسال الطلب",
-        description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
-      });
-      form.reset();
-      onSubmitted?.();
-    } else {
-      console.error("Error submitting leave request: ", result.error);
-      const errorMessage = typeof result.error === 'string' 
-        ? result.error
-        : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.";
-      
-      toast({
-        title: "خطأ",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
+  const handleFormSubmit = (data: LeaveRequestFormValues) => {
+    onSubmit(data);
+    form.reset(); // Reset form after submission is handled by parent
   };
 
   return (
@@ -120,7 +83,7 @@ export default function LeaveRequestForm({ onSubmitted, currentBalance }: LeaveR
       )}
 
       <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 pt-4">
           <FormField
               control={form.control}
               name="leaveType"
@@ -240,9 +203,9 @@ export default function LeaveRequestForm({ onSubmitted, currentBalance }: LeaveR
               )}
           />
 
-          <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <LoadingSpinner />}
-              {loading ? "جارٍ الإرسال..." : "إرسال الطلب"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "جارٍ الإرسال..." : "إرسال الطلب"}
           </Button>
           </form>
       </Form>
