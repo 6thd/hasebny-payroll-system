@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, Timestamp } from 'firebase/firestore';
+import { collection, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreListener } from '@/hooks/use-firestore-listener';
@@ -37,21 +37,20 @@ const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "seco
 interface LeaveRequestsAdminProps {
     onAction?: () => void;
     itemCount?: number;
+    showAll?: boolean;
 }
 
-export default function LeaveRequestsAdmin({ onAction, itemCount = 5 }: LeaveRequestsAdminProps) {
+export default function LeaveRequestsAdmin({ onAction, itemCount = 5, showAll = false }: LeaveRequestsAdminProps) {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const { toast } = useToast();
 
     const { data: requests, loading } = useFirestoreListener<LeaveRequest>({
-        query: query(collection(db, 'leaveRequests')),
+        query: query(collection(db, 'leaveRequests'), where('status', '==', 'pending')),
         onFetch: (allRequests) => {
-            return allRequests
-                .filter(req => req.status === 'pending')
-                .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
-                .slice(0, itemCount);
+            const sorted = allRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            return showAll ? sorted : sorted.slice(0, itemCount);
         },
-        dependencies: [itemCount]
+        dependencies: [itemCount, showAll]
     });
 
     const handleApproval = async (id: string, override: boolean, newStartDate?: Date, newEndDate?: Date) => {

@@ -1,0 +1,79 @@
+"use client";
+
+import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useFirestoreListener } from '@/hooks/use-firestore-listener';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import LoadingSpinner from '../LoadingSpinner';
+import { Badge } from '../ui/badge';
+
+interface LeaveRequest {
+    id: string;
+    employeeName: string;
+    leaveType: string;
+    startDate: Timestamp;
+    endDate: Timestamp;
+}
+
+const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
+    annual: { label: 'سنوية', variant: 'secondary' },
+    sick: { label: 'مرضية', variant: 'default' },
+    emergency: { label: 'طارئة', variant: 'destructive' },
+};
+
+export default function UpcomingLeavesTab() {
+    const { data: leaves, loading } = useFirestoreListener<LeaveRequest>({
+        query: query(
+            collection(db, 'leaveRequests'),
+            where('status', '==', 'approved'),
+            where('startDate', '>=', new Date())
+        ),
+        onFetch: (allLeaves) => allLeaves.sort((a, b) => a.startDate.toMillis() - b.startDate.toMillis()),
+    });
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>الإجازات المعتمدة القادمة</CardTitle>
+                <CardDescription>
+                    قائمة بالموظفين الذين سيبدأون إجازاتهم قريبًا.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <div className="flex justify-center items-center h-48">
+                        <LoadingSpinner />
+                    </div>
+                ) : leaves.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">لا توجد إجازات قادمة مجدولة.</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>الموظف</TableHead>
+                                <TableHead>نوع الإجازة</TableHead>
+                                <TableHead>تاريخ البدء</TableHead>
+                                <TableHead>تاريخ الانتهاء</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {leaves.map((leave) => (
+                                <TableRow key={leave.id}>
+                                    <TableCell className="font-medium">{leave.employeeName}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={leaveTypeMap[leave.leaveType]?.variant || 'default'}>
+                                            {leaveTypeMap[leave.leaveType]?.label || leave.leaveType}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>{leave.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                    <TableCell>{leave.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
