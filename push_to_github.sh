@@ -2,7 +2,6 @@
 #!/bin/bash
 echo "===================================================================="
 echo "== This script will upload your project to GitHub.                =="
-echo "== Make sure you have Git installed on your system.               =="
 echo "===================================================================="
 
 # Initialize a Git repository if it doesn't exist
@@ -17,13 +16,16 @@ fi
 echo "Adding all files..."
 git add .
 
-# Commit the files with a message
+# Prompt for a commit message
+echo "Please enter a commit message for your changes:"
+read commit_message
+
+# Commit the files with the provided message
 echo "Committing files..."
-# Check if there are any changes to commit
 if git diff-index --quiet HEAD --; then
   echo "No changes to commit."
 else
-  git commit -m "Initial commit of Hasebny Payroll System"
+  git commit -m "$commit_message"
 fi
 
 # Check if the remote 'origin' already exists
@@ -34,6 +36,10 @@ else
   echo "Remote 'origin' already exists."
   git remote set-url origin https://github.com/6thd/hasebny-payroll-system.git
 fi
+
+# Pull latest changes from GitHub before pushing
+echo "Pulling latest changes from GitHub..."
+git pull origin main --rebase
 
 # Push the code to GitHub
 echo "Pushing files to GitHub..."
