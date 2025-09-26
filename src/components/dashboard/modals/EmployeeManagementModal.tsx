@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Worker } from '@/types';
-import { Pencil, Trash2, Calculator } from 'lucide-react';
+import { Pencil, Trash2, Calculator, PlusCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -44,11 +44,16 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     setFormData(prev => ({ ...prev, [name]: isNumberField ? parseFloat(value) || 0 : value }));
   };
 
-  const selectEmployeeForEdit = (worker: Worker) => {
+  const handleSelectEmployeeForEdit = (worker: Worker) => {
     setFormData(worker);
     setIsEditing(true);
   };
   
+  const handleAddNewEmployeeClick = () => {
+    setFormData(initialFormState);
+    setIsEditing(false);
+  };
+
   const handleOpenEOSModal = (worker: Worker) => {
     setSelectedWorkerForEOS(worker);
     setIsEOSModalOpen(true);
@@ -66,9 +71,10 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     onClose();
   }
 
-  const resetForm = () => {
+  const resetFormAndClose = () => {
     setFormData(initialFormState);
     setIsEditing(false);
+    onClose();
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,7 +105,9 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
       await setDoc(doc(db, 'employees', workerId), employeeDataToSave, { merge: true });
       toast({ title: isEditing ? 'تم تحديث الموظف' : 'تم إضافة الموظف' });
       onDataUpdate();
-      resetForm();
+      if (!isEditing) {
+          setFormData(initialFormState); // Reset form only when adding a new employee
+      }
     } catch (error) {
       console.error(error);
       toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات', variant: 'destructive' });
@@ -131,13 +139,17 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetForm(); onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetFormAndClose() }}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader><DialogTitle>إدارة الموظفين</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-grow overflow-hidden">
           <div className="md:col-span-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">قائمة الموظفين</h3>
+                <Button variant="outline" size="sm" onClick={handleAddNewEmployeeClick}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    إضافة
+                </Button>
             </div>
             <ScrollArea className="border rounded-lg p-2 flex-grow">
               {sortedWorkers.map(w => {
@@ -151,7 +163,7 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                     </div>
                     {!isTerminated && (
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => selectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleSelectEmployeeForEdit(w)}><Pencil className="h-4 w-4" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -197,9 +209,6 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                 </div>
                  <p className="text-sm text-muted-foreground pt-4 border-t">ملاحظة: العمولات والسلف والجزاءات يتم إدخالها من شاشة مسير الرواتب لكل شهر على حدة.</p>
                 <div className="flex justify-end gap-2 pt-4">
-                   <Button type="button" variant="outline" onClick={resetForm}>
-                    {isEditing ? 'إلغاء التعديل' : 'مسح النموذج'}
-                  </Button>
                   <Button type="submit">{isEditing ? 'حفظ التعديلات' : 'إضافة موظف'}</Button>
                 </div>
               </form>
