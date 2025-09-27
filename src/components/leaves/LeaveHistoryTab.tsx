@@ -36,9 +36,9 @@ export default function LeaveHistoryTab() {
     const { data: requests, loading } = useFirestoreListener<LeaveRequest>({
         query: query(
             collection(db, 'leaveRequests'),
-            where('status', 'in', ['approved', 'rejected']),
             orderBy('createdAt', 'desc')
         ),
+        onFetch: (allRequests) => allRequests.filter(req => req.status === 'approved' || req.status === 'rejected'),
     });
 
     const formatDate = (timestamp: Timestamp) => {

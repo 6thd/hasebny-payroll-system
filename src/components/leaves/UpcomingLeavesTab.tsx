@@ -1,6 +1,6 @@
 "use client";
 
-import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { collection, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useFirestoreListener } from '@/hooks/use-firestore-listener';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,9 +27,13 @@ export default function UpcomingLeavesTab() {
         query: query(
             collection(db, 'leaveRequests'),
             where('status', '==', 'approved'),
-            where('startDate', '>=', new Date())
+            orderBy('startDate', 'asc')
         ),
-        onFetch: (allLeaves) => allLeaves.sort((a, b) => a.startDate.toMillis() - b.startDate.toMillis()),
+        onFetch: (allLeaves) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return allLeaves.filter(leave => leave.startDate.toDate() >= today);
+        }
     });
 
     return (
