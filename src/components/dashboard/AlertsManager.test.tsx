@@ -1,9 +1,4 @@
-/**
- * This is a simple test file to demonstrate the functionality of the AlertsManager component.
- * In a real application, this would be replaced with proper unit tests using Jest or a similar framework.
- */
-
-// Import the actual Worker type from the relative path
+import { describe, it, expect } from 'vitest';
 import type { Worker } from '../../types';
 
 interface AlertItem {
@@ -84,14 +79,14 @@ const mockWorkers: Worker[] = [
 ];
 
 // Test the alert generation logic
-export function testAlertGeneration() {
+function generateAlerts(workers: Worker[]) {
   const alerts: AlertItem[] = [];
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   
   // Check contract expiries (within 30 days)
-  mockWorkers.forEach(worker => {
+  workers.forEach(worker => {
     // Check for contract end date (terminationDate) or if there's a contract end field
     if (worker.terminationDate) {
       const terminationDate = new Date(worker.terminationDate);
@@ -115,7 +110,7 @@ export function testAlertGeneration() {
   });
   
   // Check absence limits (more than 5 absences in the current month)
-  mockWorkers.forEach(worker => {
+  workers.forEach(worker => {
     if (worker.absentDays && worker.absentDays > 5) {
       const severity = worker.absentDays > 10 ? 'high' : worker.absentDays > 7 ? 'medium' : 'low';
       alerts.push({
@@ -131,7 +126,7 @@ export function testAlertGeneration() {
   });
   
   // Check for upcoming performance reviews (hire date anniversary)
-  mockWorkers.forEach(worker => {
+  workers.forEach(worker => {
     if (worker.hireDate) {
       const hireDate = new Date(worker.hireDate);
       const nextReview = new Date(today.getFullYear(), hireDate.getMonth(), hireDate.getDate());
@@ -161,7 +156,7 @@ export function testAlertGeneration() {
   });
   
   // Check for potential payroll errors (more comprehensive checks)
-  mockWorkers.forEach(worker => {
+  workers.forEach(worker => {
     let hasPotentialPayrollError = false;
     let errorDescription = '';
     
@@ -195,9 +190,42 @@ export function testAlertGeneration() {
     }
   });
   
-  console.log('Generated alerts:', alerts);
   return alerts;
 }
 
-// Run the test
-testAlertGeneration();
+describe('AlertsManager', () => {
+  it('generates contract expiry alerts', () => {
+    const alerts = generateAlerts(mockWorkers);
+    const contractAlert = alerts.find(alert => alert.type === 'contract_expiry');
+    
+    expect(contractAlert).toBeDefined();
+    expect(contractAlert?.title).toBe('انتهاء عقد الموظف قريباً');
+    expect(contractAlert?.employeeName).toBe('أحمد عبدالله');
+  });
+
+  it('generates absence limit alerts', () => {
+    const alerts = generateAlerts(mockWorkers);
+    const absenceAlerts = alerts.filter(alert => alert.type === 'absence_limit');
+    
+    expect(absenceAlerts.length).toBe(2); // Both فاطمة علي and أحمد عبدالله have excessive absences
+    
+    const highSeverityAlert = absenceAlerts.find(alert => alert.severity === 'high');
+    const mediumSeverityAlert = absenceAlerts.find(alert => alert.severity === 'medium');
+    
+    expect(highSeverityAlert).toBeDefined();
+    expect(highSeverityAlert?.employeeName).toBe('أحمد عبدالله');
+    
+    expect(mediumSeverityAlert).toBeDefined();
+    expect(mediumSeverityAlert?.employeeName).toBe('فاطمة علي');
+  });
+
+  it('generates payroll error alerts', () => {
+    const alerts = generateAlerts(mockWorkers);
+    const payrollError = alerts.find(alert => alert.type === 'payroll_error');
+    
+    expect(payrollError).toBeDefined();
+    expect(payrollError?.severity).toBe('high');
+    expect(payrollError?.title).toBe('خطأ محتمل في حساب الراتب');
+    expect(payrollError?.employeeName).toBe('أحمد عبدالله');
+  });
+});
