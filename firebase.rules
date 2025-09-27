@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isEmployee() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/employees/$(request.auth.uid));
+    }
+    
+    function isOwnData(employeeId) {
+      return isSignedIn() && request.auth.uid == employeeId;
+    }
+    
+    // Employees collection - Master employee data
+    match /employees/{employeeId} {
+      // Anyone authenticated can read their own employee record
+      allow read: if isOwnData(employeeId) || isAdmin();
+      
+      // Only admins can create new employee records
+      allow create: if isAdmin();
+      
+      // Only admins can update employee records
+      allow update: if isAdmin();
+      
+      // No one can delete employee records
+      allow delete: if false;
+    }
+    
+    // Salary collections - Monthly payroll data
+    match /salaries_{year}_{month}/{employeeId} {
+      // Only admins and the employee themselves can read salary data
+      allow read: if isOwnData(employeeId) || isAdmin();
+      
+      // Only admins can create or update salary records
+      allow create, update: if isAdmin();
+      
+      // No one can delete salary records
+      allow delete: if false;
+    }
+    
+    // Leave requests
+    match /leaveRequests/{employeeId}/{requestId} {
+      // Employees can read their own requests
+      allow read: if isOwnData(employeeId) || isAdmin();
+      
+      // Employees can create requests, admins can create for anyone
+      allow create: if isOwnData(employeeId) || isAdmin();
+      
+      // Only admins can update status of requests
+      allow update: if isAdmin();
+      
+      // Only admins can delete requests
+      allow delete: if isAdmin();
+    }
+    
+    // Attendance data
+    match /attendance_{year}_{month}/{employeeId}/{day} {
+      // Employees can read their own attendance
+      allow read: if isOwnData(employeeId) || isAdmin();
+      
+      // Admins can create/update attendance for anyone
+      // Employees can update their own attendance (for self-check-in)
+      allow create, update: if isOwnData(employeeId) || isAdmin();
+      
+      // Only admins can delete attendance records
+      allow delete: if isAdmin();
+    }
+    
+    // Audit logs
+    match /auditLogs/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+      
+      // System can create audit logs (via server functions)
+      allow create: if false; // Created by server-side functions only
+      
+      // No one can update or delete audit logs
+      allow update, delete: if false;
+    }
+    
+    // Public configuration data (if any)
+    match /config/{configId} {
+      // Anyone can read public configuration
+      allow read: if true;
+      
+      // Only admins can update configuration
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

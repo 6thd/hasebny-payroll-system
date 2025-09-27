@@ -53,3 +53,69 @@ This is a comprehensive payroll management system built with Next.js and Firebas
 - **طبقة أمان قوية** بفضل نظام الأنواع في Rust
 
 للحصول على معلومات أكثر تفصيلاً حول تنفيذ WebAssembly، راجع [WASM_PAYROLL.md](WASM_PAYROLL.md).
+
+## الإعداد والتشغيل
+
+### المتطلبات الأساسية
+
+1. Node.js 20+
+2. Rust و Cargo (لتطوير WebAssembly)
+3. حساب Firebase
+
+### التثبيت
+
+```bash
+npm install
+```
+
+### تشغيل خادم التطوير
+
+```bash
+npm run dev
+```
+
+سيكون التطبيق متاحًا على http://localhost:9002
+
+## هيكل المشروع
+
+```
+hasebny-payroll-system/
+├── src/
+│   ├── app/              # صفحات Next.js
+│   ├── components/       # مكونات React
+│   ├── lib/              # الوظائف المساعدة ومنطق الأعمال
+│   ├── types/            # أنواع TypeScript
+│   └── ai/               # تكامل الذكاء الاصطناعي مع Genkit
+├── wasm-payroll/         # حاسبة الرواتب WebAssembly مكتوبة بلغة Rust
+├── docs/                 # التوثيق
+└── .github/workflows/    # أنظمة CI/CD
+```
+
+## الاختبارات
+
+### تشغيل الاختبارات
+
+```bash
+npm test
+```
+
+### هيكل الاختبارات
+
+- `src/lib/*.test.ts` - اختبارات وحدة منطق الأعمال
+- `src/components/**/*.test.tsx` - اختبارات المكونات
+
+## الأمان
+
+للحصول على إرشادات الأمان التفصيلية، راجع [SECURITY.md](docs/SECURITY.md).
+
+## المساهمة
+
+### سير العمل في Git
+
+1. انشئ نسخة من المستودع (Fork)
+2. أنشئ فرعًا للميزة (feature branch)
+3. قم بإجراء التغييرات
+4. اكتب الاختبارات إذا لزم الأمر
+5. أرسل طلب سحب (pull request)
+
+للحصول على معلومات أكثر تفصيلاً حول التطوير، راجع [DEVELOPMENT.md](docs/DEVELOPMENT.md).
