@@ -44,7 +44,7 @@ export default function LeaveManagementDashboard() {
           </CardHeader>
         </Card>
 
-        <Tabs defaultValue="pending" className="w-full">
+        <Tabs defaultValue="history" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="pending">
                 <Briefcase className="ml-2 h-4 w-4" />
