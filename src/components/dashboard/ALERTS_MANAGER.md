@@ -2,7 +2,7 @@
 
 ## نظرة عامة
 
-مكون [AlertsManager](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AlertsManager.tsx#L29-L220) هو نظام تنبيهات ذكية لمراقبة وتحليل بيانات الموظفين وإصدار تنبيهات تلقائية عند اكتشاف مشكلات أو أحداث مهمة.
+مكون [AlertsManager](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AlertsManager.tsx#L29-L227) هو نظام تنبيهات ذكية لمراقبة وتحليل بيانات الموظفين وإصدار تنبيهات تلقائية عند اكتشاف مشكلات أو أحداث مهمة.
 
 ## الميزات
 
@@ -29,11 +29,14 @@
 
 ### 4. تحذير من أخطاء في حساب الرواتب
 - يراقب البيانات المالية للموظفين للبحث عن قيم غير صحيحة
-- يصدر تنبيهات عند اكتشاف راتب أساسي سالب
+- يصدر تنبيهات في الحالات التالية:
+  - راتب أساسي سالب
+  - قيمة إحدى البدلات سالبة
+  - بيانات موظف غير مكتملة
 
 ## التكامل
 
-تم دمج مكون [AlertsManager](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AlertsManager.tsx#L29-L220) في لوحة تحكم المدير في ملف [AdminAnalytics.tsx](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AdminAnalytics.tsx).
+تم دمج مكون [AlertsManager](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AlertsManager.tsx#L29-L227) في لوحة تحكم المدير في ملف [AdminAnalytics.tsx](file:///c:/Users/mojah/Downloads/hasebny/hasebny-payroll-system/src/components/dashboard/AdminAnalytics.tsx).
 
 ## الاستخدام
 
@@ -47,6 +50,18 @@
 - عتبة الغياب: `worker.absentDays > 5`
 - عتبة انتهاء العقد: 30 يومًا
 - عتبة المراجعة السنوية: 30 يومًا
+
+## التحسينات الجديدة
+
+### 1. مراقبة أكثر دقة لانتهاء العقود
+- التحقق من حقل `terminationDate` بدلاً من الحالة فقط
+
+### 2. تحسين التحقق من أخطاء الرواتب
+- التحقق من السالب في جميع البدلات وليس فقط الراتب الأساسي
+- التحقق من اكتمال بيانات الموظف
+
+### 3. تحديد أكثر دقة لفترة الغياب
+- تتبع الغياب حسب الشهر الحالي
 
 ## التصميم
 

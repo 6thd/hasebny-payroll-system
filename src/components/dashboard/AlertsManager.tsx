@@ -43,12 +43,15 @@ export default function AlertsManager({ workers, isAdmin }: AlertsManagerProps) 
     if (!isAdmin) return;
     
     const newAlerts: AlertItem[] = [];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
     
     // Check contract expiries (within 30 days)
     workers.forEach(worker => {
-      if (worker.status === 'Terminated' && worker.terminationDate) {
+      // Check for contract end date (terminationDate) or if there's a contract end field
+      if (worker.terminationDate) {
         const terminationDate = new Date(worker.terminationDate);
-        const today = new Date();
         const daysUntilTermination = Math.ceil(
           (terminationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
         );
@@ -66,13 +69,16 @@ export default function AlertsManager({ workers, isAdmin }: AlertsManagerProps) 
           });
         }
       }
-      
-      // Check absence limits (more than 5 absences in a month)
+    });
+    
+    // Check absence limits (more than 5 absences in the current month)
+    workers.forEach(worker => {
       if (worker.absentDays && worker.absentDays > 5) {
+        const severity = worker.absentDays > 10 ? 'high' : worker.absentDays > 7 ? 'medium' : 'low';
         newAlerts.push({
-          id: `absence-${worker.id}`,
+          id: `absence-${worker.id}-${currentYear}-${currentMonth}`,
           type: 'absence_limit',
-          severity: worker.absentDays > 10 ? 'high' : worker.absentDays > 7 ? 'medium' : 'low',
+          severity,
           title: 'تجاوز حد الغياب المسموح',
           description: `الموظف ${worker.name} غائب ${worker.absentDays} أيام هذا الشهر`,
           employeeId: worker.id,
@@ -82,7 +88,6 @@ export default function AlertsManager({ workers, isAdmin }: AlertsManagerProps) 
     });
     
     // Check for upcoming performance reviews (hire date anniversary)
-    const today = new Date();
     workers.forEach(worker => {
       if (worker.hireDate) {
         const hireDate = new Date(worker.hireDate);
@@ -112,11 +117,27 @@ export default function AlertsManager({ workers, isAdmin }: AlertsManagerProps) 
       }
     });
     
-    // Check for potential payroll errors (negative net salary)
+    // Check for potential payroll errors (more comprehensive checks)
     workers.forEach(worker => {
-      // In a real implementation, we would calculate payroll here
-      // For now, we'll just simulate checking for errors
-      const hasPotentialPayrollError = worker.basicSalary < 0;
+      let hasPotentialPayrollError = false;
+      let errorDescription = '';
+      
+      // Check for negative basic salary
+      if (worker.basicSalary < 0) {
+        hasPotentialPayrollError = true;
+        errorDescription = `قيمة الراتب الأساسية للموظف ${worker.name} سالبة`;
+      }
+      // Check for negative allowances
+      else if (worker.housing < 0 || worker.workNature < 0 || worker.transport < 0 || 
+               worker.phone < 0 || worker.food < 0) {
+        hasPotentialPayrollError = true;
+        errorDescription = `قيمة إحدى البدلات للموظف ${worker.name} سالبة`;
+      }
+      // Check for missing required data
+      else if (!worker.name || !worker.basicSalary) {
+        hasPotentialPayrollError = true;
+        errorDescription = `بيانات الموظف ${worker.name || 'غير محدد'} غير مكتملة`;
+      }
       
       if (hasPotentialPayrollError) {
         newAlerts.push({
@@ -124,7 +145,7 @@ export default function AlertsManager({ workers, isAdmin }: AlertsManagerProps) 
           type: 'payroll_error',
           severity: 'high',
           title: 'خطأ محتمل في حساب الراتب',
-          description: `قيمة الراتب الأساسية للموظف ${worker.name} سالبة`,
+          description: errorDescription,
           employeeId: worker.id,
           employeeName: worker.name
         });
