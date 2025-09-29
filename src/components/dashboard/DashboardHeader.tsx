@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu';
+import { Button as MUIButton } from '@mui/material';
 
 interface DashboardHeaderProps {
   user: AppUser;
@@ -119,6 +120,20 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
                 </SelectContent>
               </Select>
             </div>
+            <MUIButton 
+              variant="outlined" 
+              size="small"
+              onClick={() => router.push('/mui-demo')}
+            >
+              عرض MUI
+            </MUIButton>
+            <MUIButton 
+              variant="outlined" 
+              size="small"
+              onClick={() => router.push('/mui-components-demo')}
+            >
+              مكونات MUI
+            </MUIButton>
             <div className="flex items-center gap-2">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

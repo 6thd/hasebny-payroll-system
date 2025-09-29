@@ -1,6 +1,10 @@
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700&display=swap');
 
 @layer base {
   :root {
@@ -96,6 +100,438 @@
   color: hsl(var(--primary)) !important;
 }
 
+/* Professional Print Styles for Leave Settlement Report */
+@media print {
+  @page {
+    margin: 1.5cm;
+  }
+  
+  body {
+    direction: rtl;
+    font-family: 'Cairo', 'Tajawal', Arial, sans-serif;
+    background-color: white !important;
+    background-image: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+  
+  /* Hide all non-essential elements */
+  .no-print, 
+  .sidebar, 
+  .actions-bar, 
+  .MuiButton-root, 
+  .nav-bar,
+  .dialog-overlay,
+  .close-button,
+  [data-radix-dialog-content],
+  .print-hide {
+    display: none !important;
+  }
+  
+  /* Print container */
+  .print-container {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+  }
+  
+  /* Print header */
+  .print-header {
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+    page-break-after: avoid;
+  }
+  
+  .print-header h1 {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #333;
+    margin: 0 0 8px 0;
+  }
+  
+  .print-header h2 {
+    font-size: 16pt;
+    font-weight: 600;
+    color: #555;
+    margin: 0 0 5px 0;
+  }
+  
+  .print-header-info {
+    font-size: 11pt;
+    color: #666;
+    margin-top: 8px;
+  }
+  
+  /* Employee info section */
+  .employee-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+  }
+  
+  .employee-info h3 {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 10px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .employee-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .employee-detail-item {
+    font-size: 11pt;
+  }
+  
+  .employee-detail-label {
+    font-weight: 600;
+    color: #555;
+    display: inline-block;
+    min-width: 120px;
+  }
+  
+  /* Summary card */
+  .print-summary {
+    background: #f0f4ff;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 25px 0;
+    text-align: center;
+    page-break-inside: avoid;
+    border: 1px solid #d0d7ff;
+  }
+  
+  .print-summary-title {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #444;
+    margin-bottom: 15px;
+  }
+  
+  .print-balance-days {
+    font-size: 32pt;
+    font-weight: bold;
+    color: #2563eb;
+    margin: 10px 0;
+  }
+  
+  .print-balance-value {
+    font-size: 18pt;
+    font-weight: 600;
+    color: #059669;
+    margin: 10px 0;
+  }
+  
+  .print-calculation-info {
+    font-size: 11pt;
+    color: #666;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+  }
+  
+  /* Policy sections */
+  .policy-section {
+    background: #fff;
+    border-radius: 8px;
+    margin: 15px 0;
+    border: 1px solid #eee;
+    page-break-inside: avoid;
+  }
+  
+  .policy-section-header {
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    font-weight: 600;
+    font-size: 13pt;
+    color: #333;
+  }
+  
+  .policy-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .policy-item:last-child {
+    border-bottom: none;
+  }
+  
+  .policy-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .policy-title {
+    font-weight: 600;
+    font-size: 12pt;
+    color: #444;
+  }
+  
+  .badge-custom, .badge-default {
+    font-size: 9pt;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+  
+  .badge-custom {
+    background: #fff8ea;
+    color: #d99e36;
+    border: 1px solid #f5d8b0;
+  }
+  
+  .badge-default {
+    background: #eafaf1;
+    color: #39b463;
+    border: 1px solid #c5e5d2;
+  }
+  
+  .policy-value {
+    font-size: 11pt;
+    margin: 5px 0;
+  }
+  
+  .policy-value-boolean {
+    font-weight: 600;
+  }
+  
+  .policy-value-boolean.true {
+    color: #059669;
+  }
+  
+  .policy-value-boolean.false {
+    color: #dc2626;
+  }
+  
+  .policy-description {
+    color: #666;
+    font-size: 10pt;
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+  
+  .policy-custom-note {
+    background: #fff8ea;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 9.5pt;
+    color: #d99e36;
+    border: 1px solid #f5d8b0;
+  }
+  
+  /* Calculation details */
+  .calculation-details {
+    margin: 20px 0;
+    page-break-inside: avoid;
+  }
+  
+  .calculation-details-header {
+    font-size: 13pt;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .calculation-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 11pt;
+  }
+  
+  .calculation-label {
+    color: #666;
+  }
+  
+  .calculation-value {
+    font-weight: 500;
+    color: #333;
+  }
+  
+  /* Notes section */
+  .print-notes {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+    page-break-inside: avoid;
+  }
+  
+  .print-notes-header {
+    font-size: 12pt;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  .print-notes-content {
+    min-height: 60px;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    padding: 15px;
+    font-size: 11pt;
+    color: #666;
+  }
+  
+  .print-signature {
+    margin-top: 40px;
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  .signature-box {
+    width: 45%;
+    text-align: center;
+  }
+  
+  .signature-line {
+    margin-top: 50px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+    font-size: 11pt;
+    color: #666;
+  }
+  
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always;
+  }
+  
+  .page-break-after {
+    page-break-after: always;
+  }
+  
+  .no-page-break {
+    page-break-inside: avoid;
+  }
+  
+  /* MUI Components Demo Print Styles */
+  .printable {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+  
+  /* Improve spacing and layout for print */
+  .MuiCard-root {
+    page-break-inside: avoid;
+    margin-bottom: 15px !important;
+    border-radius: 6px !important;
+    border: 1px solid #eee !important;
+    box-shadow: none !important;
+  }
+  
+  .MuiTypography-h4 {
+    color: #2563eb !important;
+    font-size: 24pt !important;
+    margin-bottom: 20px !important;
+  }
+  
+  .MuiTypography-h6 {
+    color: #2563eb !important;
+    font-size: 16pt !important;
+  }
+  
+  .MuiTabs-root, .MuiTab-root {
+    border-bottom: 1px solid #eee !important;
+  }
+  
+  .MuiCardHeader-root {
+    background-color: #f8f9fa !important;
+    border-bottom: 1px solid #eee !important;
+    padding: 12px 16px !important;
+  }
+  
+  .MuiCardContent-root {
+    padding: 16px !important;
+  }
+  
+  .MuiDataGrid-root {
+    border: 1px solid #eee !important;
+  }
+  
+  .MuiDataGrid-cell, .MuiDataGrid-columnHeader {
+    border-color: #eee !important;
+  }
+  
+  .MuiAlert-root {
+    margin-bottom: 10px !important;
+    border-radius: 6px !important;
+  }
+  
+  .MuiLinearProgress-root {
+    margin: 10px 0 !important;
+  }
+  
+  /* Ensure proper spacing between sections */
+  .MuiBox-root {
+    margin-bottom: 20px !important;
+  }
+  
+  /* Hide interactive elements */
+  .MuiDataGrid-columnHeaders .MuiDataGrid-menuIcon,
+  .MuiDataGrid-cell .MuiDataGrid-menuIcon,
+  .MuiDataGrid-cell .MuiIconButton-root,
+  .MuiDataGrid-footerContainer .MuiTablePagination-root {
+    display: none !important;
+  }
+  
+  /* Simplify DataGrid for printing */
+  .MuiDataGrid-root .MuiDataGrid-overlay {
+    display: none !important;
+  }
+}
+
+.printing-pdf {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+.printing-pdf table {
+  background-color: white !important;
+  color: black !important;
+}
+
+.printing-pdf .bg-background {
+  background-color: white !important;
+}
+
+.printing-pdf .text-green-600 {
+  color: #16a34a !important;
+}
+
+.printing-pdf .text-red-600 {
+  color: #dc2626 !important;
+}
+
+.printing-pdf .text-primary {
+  color: hsl(var(--primary)) !important;
+}
 
 @media print {
   .no-print {
@@ -126,3 +562,4 @@
       background-color: white !important;
   }
 }
+/* stylelint-enable at-rule-no-unknown */

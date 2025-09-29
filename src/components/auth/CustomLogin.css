@@ -1,0 +1,114 @@
+body, .login-bg {
+  min-height: 100vh;
+  background: linear-gradient(120deg,#40e0d0,#008080,#70a1ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.login-card {
+  background: rgba(255,255,255,0.97);
+  border-radius: 18px;
+  box-shadow: 0 6px 40px rgba(44,62,80,0.17);
+  padding: 2.5rem 2rem 1.5rem 2rem;
+  width: 350px;
+  text-align: center;
+}
+
+.logo {
+  width: 56px;
+  margin-bottom: 18px;
+}
+
+h2 {
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: #1558a1;
+}
+
+.subtitle {
+  margin-bottom: 18px;
+  color: #666;
+  font-size: 1em;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.1rem;
+  background: #f5f6fa;
+  border-radius: 8px;
+  padding: 9px 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.input-group .icon {
+  font-size: 1.3em;
+  margin-left: 9px;
+  margin-right: 5px;
+  color: #16c995;
+}
+
+input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  font-size: 1em;
+  outline: none;
+  padding: 7px 5px;
+  text-align: right;
+  direction: rtl;
+}
+
+.login-btn {
+  background: linear-gradient(80deg,#1e90ff,#16c995);
+  border: none;
+  color: #fff;
+  font-size: 1.13em;
+  border-radius: 8px;
+  padding: 13px 0;
+  width: 100%;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: background 0.18s;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.login-btn:hover:not(:disabled) {
+  background: linear-gradient(90deg,#1558a1,#119c77);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.signup-msg {
+  font-size: 0.96em;
+  color: #555;
+}
+
+.signup-msg a {
+  color: #1e90ff;
+  text-decoration: none;
+  font-weight: 600;
+  margin-right: 3px;
+}
+
+.error-message {
+  color: #e74c3c;
+  font-size: 0.9em;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 500px) {
+  .login-card {
+    width: 95vw;
+    padding: 2rem 1rem 1.2rem 1rem;
+  }
+}

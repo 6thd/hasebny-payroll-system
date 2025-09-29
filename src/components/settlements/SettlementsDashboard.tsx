@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,6 +13,7 @@ import EosSettlementTab from './EosSettlementTab';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
+import { checkFirebaseConnection, checkNetworkConnectivity } from '@/lib/firebase-utils';
 
 const LEAVE_TYPES_FOR_SETTLEMENT = ["annual", "emergency"] as const;
 
@@ -23,24 +23,62 @@ export default function SettlementsDashboard() {
   const [eosWorkers, setEosWorkers] = useState<Worker[]>([]);
   const [leaveWorkers, setLeaveWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!user || user.role !== 'admin') {
+    console.log("SettlementsDashboard: Starting fetchData");
+    
+    if (!user) {
+      console.log("SettlementsDashboard: No user, skipping fetch");
       setLoading(false);
       return;
     }
+    
+    if (user.role !== 'admin') {
+      console.log("SettlementsDashboard: User not admin, skipping fetch");
+      setLoading(false);
+      return;
+    }
+    
+    // Check network connectivity first
+    if (!checkNetworkConnectivity()) {
+      console.log("SettlementsDashboard: No network connectivity");
+      setError("لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك بالشبكة.");
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
+    
     try {
+      console.log("SettlementsDashboard: Checking Firebase connection");
+      const connectionCheck = await checkFirebaseConnection();
+      if (!connectionCheck.success) {
+        console.log("SettlementsDashboard: Firebase connection failed");
+        setError(`فشل الاتصال بقاعدة البيانات: ${connectionCheck.error}`);
+        setLoading(false);
+        return;
+      }
+      
+      console.log("SettlementsDashboard: Fetching EOS data");
       // --- Fetch for End of Service Tab ---
       const eosSnapshot = await getDocs(collection(db, "employees"));
+      console.log("SettlementsDashboard: EOS snapshot received", eosSnapshot.size);
+      
       const activeWorkersForEos = eosSnapshot.docs
         .map(d => ({ id: d.id, ...d.data() } as Worker))
         .filter(w => (w.status ?? "Active") !== "Terminated");
+      console.log("SettlementsDashboard: Active workers for EOS", activeWorkersForEos.length);
       setEosWorkers(activeWorkersForEos);
 
+      console.log("SettlementsDashboard: Fetching leave data");
       // --- Fetch for Leave Settlement Tab ---
       const allEmployeesSnapshot = await getDocs(collection(db, "employees"));
-      const allWorkers = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      console.log("SettlementsDashboard: All employees snapshot received", allEmployeesSnapshot.size);
+      
+      const allWorkers: Worker[] = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      console.log("SettlementsDashboard: All workers processed", allWorkers.length);
       
       const leaveRequestsQuery = query(
         collection(db, "leaveRequests"), 
@@ -48,7 +86,9 @@ export default function SettlementsDashboard() {
         where("leaveType", "in", [...LEAVE_TYPES_FOR_SETTLEMENT])
       );
       
+      console.log("SettlementsDashboard: Fetching leave requests");
       const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
+      console.log("SettlementsDashboard: Leave requests snapshot received", leaveRequestsSnapshot.size);
       
       const approvedLeaveData: { [employeeId: string]: string } = {};
       leaveRequestsSnapshot.forEach(doc => {
@@ -60,34 +100,61 @@ export default function SettlementsDashboard() {
           }
       });
       
+      console.log("SettlementsDashboard: Approved leave data processed", Object.keys(approvedLeaveData).length);
       const approvedEmployeeIds = Object.keys(approvedLeaveData);
 
       if (approvedEmployeeIds.length > 0) {
         const leaveWorkersToLoad = allWorkers
-            .filter(worker => approvedEmployeeIds.includes(worker.id))
-            .map(worker => ({
+            .filter((worker: Worker) => approvedEmployeeIds.includes(worker.id))
+            .map((worker: Worker) => ({
                 ...worker,
                 lastApprovedLeaveDate: approvedLeaveData[worker.id]
             }));
+        console.log("SettlementsDashboard: Leave workers to load", leaveWorkersToLoad.length);
         setLeaveWorkers(leaveWorkersToLoad);
       } else {
+        console.log("SettlementsDashboard: No approved leave workers");
         setLeaveWorkers([]);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching workers: ", error);
+      // Check if it's a network error
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setError("فشل الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت وإعادة المحاولة.");
+      } else {
+        setError(error instanceof Error ? error.message : "حدث خطأ أثناء جلب البيانات");
+      }
     } finally {
+      console.log("SettlementsDashboard: Finished fetchData");
       setLoading(false);
     }
   }, [user]);
 
 
   useEffect(() => {
+    console.log("SettlementsDashboard: useEffect triggered");
     fetchData();
   }, [fetchData]);
 
   if (loading) {
+    console.log("SettlementsDashboard: Showing loading spinner");
     return <LoadingSpinner fullScreen />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="max-w-md mx-auto p-6 bg-destructive/10 rounded-lg">
+          <h3 className="text-lg font-semibold text-destructive mb-2">خطأ في تحميل البيانات</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button onClick={fetchData}>إعادة المحاولة</Button>
+            <Button variant="outline" onClick={() => router.push('/')}>العودة للوحة التحكم</Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (user?.role !== 'admin') {
@@ -97,6 +164,11 @@ export default function SettlementsDashboard() {
       </div>
     );
   }
+
+  console.log("SettlementsDashboard: Rendering dashboard with", {
+    eosWorkers: eosWorkers.length,
+    leaveWorkers: leaveWorkers.length
+  });
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

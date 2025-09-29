@@ -1,10 +1,10 @@
-import AuthLayout from "@/components/auth/AuthLayout";
-import LoginForm from "@/components/auth/LoginForm";
+import CustomLoginForm from "@/components/auth/CustomLoginForm";
+import "./../../components/auth/CustomLogin.css";
 
 export default function LoginPage() {
   return (
-    <AuthLayout>
-      <LoginForm />
-    </AuthLayout>
+    <div className="min-h-screen flex items-center justify-center">
+      <CustomLoginForm />
+    </div>
   );
 }

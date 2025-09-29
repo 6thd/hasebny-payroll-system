@@ -1,7 +1,7 @@
 "use client";
 
 import type { Worker } from '@/types';
-import AdminAnalytics from './AdminAnalytics';
+import MUIAdminAnalytics from './MUIAdminAnalytics';
 import AttendanceTable from './AttendanceTable';
 
 interface AdminDashboardProps {
@@ -22,7 +22,7 @@ export default function AdminDashboard({
   return (
     <div className="mt-6">
       {activeView === 'analytics' ? (
-        <AdminAnalytics workers={workers} isAdmin={isAdmin} />
+        <MUIAdminAnalytics workers={workers} isAdmin={isAdmin} />
       ) : (
         <div className="bg-card p-4 rounded-xl shadow-lg">
           <AttendanceTable

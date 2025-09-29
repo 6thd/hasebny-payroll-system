@@ -1,0 +1,13 @@
+diff --git a/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs b/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs
+index 466430e..791de10 100644
+--- a/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs
++++ b/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs
+@@ -1,7 +1,7 @@
+ import { computePosition, arrow as arrow$2, autoPlacement as autoPlacement$1, flip as flip$1, hide as hide$1, inline as inline$1, limitShift as limitShift$1, offset as offset$1, shift as shift$1, size as size$1 } from '@floating-ui/dom';
+ export { autoUpdate, computePosition, detectOverflow, getOverflowAncestors, platform } from '@floating-ui/dom';
+ import * as React from 'react';
+-import { useLayoutEffect } from 'react';
++var useLayoutEffect = React.useLayoutEffect || function () {};
+ import * as ReactDOM from 'react-dom';
+ 
+ var isClient = typeof document !== 'undefined';
