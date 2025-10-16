@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, where, collectionGroup, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, collectionGroup } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import type { Worker, ServiceHistoryItem } from '@/types';
@@ -75,7 +75,7 @@ export default function SettlementsDashboard() {
       }
       
       // --- Fetch for History Tab ---
-        const historyQuery = query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc'));
+        const historyQuery = query(collectionGroup(db, 'serviceHistory'));
         const historySnapshot = await getDocs(historyQuery);
         const employeeNames: { [id: string]: string } = {};
         allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
@@ -90,7 +90,14 @@ export default function SettlementsDashboard() {
                 employeeName: employeeNames[employeeId] || 'موظف غير معروف',
             } as ServiceHistoryItem;
         });
-      setHistory(historyItems);
+      
+        historyItems.sort((a, b) => {
+            const dateA = a.finalizedAt?.toDate() ?? new Date(0);
+            const dateB = b.finalizedAt?.toDate() ?? new Date(0);
+            return dateB.getTime() - dateA.getTime();
+        });
+
+        setHistory(historyItems);
 
 
     } catch (error) {
