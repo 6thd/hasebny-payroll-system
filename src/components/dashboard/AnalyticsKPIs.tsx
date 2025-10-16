@@ -10,7 +10,7 @@ import { calculatePayroll } from '@/lib/utils';
 import LoadingSpinner from '../LoadingSpinner';
 
 const KPICard = ({ title, value, icon, isLoading }: { title: string; value: string | number; icon: React.ReactNode, isLoading: boolean }) => (
-  <Card className="shadow-lg transition-all hover:shadow-xl hover:scale-105 border-l-4 border-primary">
+  <Card className="shadow-lg transition-all hover:shadow-xl hover:shadow-primary/20 hover:scale-105 border-l-4 border-primary">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       {icon}
@@ -19,7 +19,7 @@ const KPICard = ({ title, value, icon, isLoading }: { title: string; value: stri
       {isLoading ? (
         <div className="h-8 w-1/2 mt-1 rounded-md animate-pulse bg-muted"></div>
       ) : (
-        <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
       )}
     </CardContent>
   </Card>
