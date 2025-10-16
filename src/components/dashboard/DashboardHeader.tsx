@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import PayrollModal from './modals/PayrollModal';
 import EmployeeManagementModal from './modals/EmployeeManagementModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu';
+import { DarkModeToggle } from '../DarkModeToggle';
 
 interface DashboardHeaderProps {
   user: AppUser;
@@ -41,7 +42,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
       <header className="no-print bg-card shadow-sm rounded-xl p-4">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-center sm:text-right">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-gray-100">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
               {isAdmin ? 'لوحة تحكم المدير' : 'بوابة الموظف'}
             </h1>
             <p className="text-sm text-muted-foreground">{isAdmin ? `نظرة عامة لشهر ${MONTHS[date.month]} ${date.year}` : 'مرحباً بعودتك'}</p>
@@ -124,10 +125,11 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
               </Select>
             </div>
             <div className="flex items-center gap-2">
+                <DarkModeToggle />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="px-3 py-1.5 h-auto">
-                            <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            <div className="text-sm font-semibold">
                                 {user.name || user.email}
                             </div>
                             <ChevronDown className="mr-2 h-4 w-4" />

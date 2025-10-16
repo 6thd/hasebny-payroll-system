@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'Hasebny - نظام الحضور والرواتب',
@@ -30,10 +31,17 @@ export default function RootLayout({
         )}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          {children}
-          <Toaster />
-        </AuthProvider>
+        <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+        >
+            <AuthProvider>
+            {children}
+            <Toaster />
+            </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
