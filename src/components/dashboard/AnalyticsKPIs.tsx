@@ -40,7 +40,7 @@ export default function AnalyticsKPIs() {
             setLoading(true);
             try {
                 // Fetch all employees
-                const employeesSnapshot = await getDocs(collection(db, 'employees'));
+                const employeesSnapshot = await getDocs(query(collection(db, 'employees'), where('status', '!=', 'Terminated')));
                 const workers = employeesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Worker));
                 const totalEmployees = workers.length;
 
@@ -86,11 +86,14 @@ export default function AnalyticsKPIs() {
                     .map(doc => doc.data())
                     .filter(leave => leave.status === 'approved');
 
-                const onLeaveToday = approvedLeaves.filter(leave => {
+                const onLeaveIds = new Set<string>();
+                 approvedLeaves.forEach(leave => {
                      const startDate = leave.startDate.toDate();
                      const endDate = leave.endDate.toDate();
-                     return startDate <= todayStart && endDate >= todayStart;
-                }).length;
+                     if(startDate <= todayStart && endDate >= todayStart) {
+                         onLeaveIds.add(leave.employeeId);
+                     }
+                });
 
 
                 // Fetch absent employees today
@@ -100,9 +103,6 @@ export default function AnalyticsKPIs() {
 
                 if (!isFriday) {
                     const employeeIds = workers.map(w => w.id);
-                    const onLeaveIds = new Set(approvedLeaves
-                        .filter(leave => leave.startDate.toDate() <= todayStart && leave.endDate.toDate() >= todayStart)
-                        .map(leave => leave.employeeId));
 
                     const attendedIds = new Set<string>();
                     attendanceSnapshot.forEach(doc => {
@@ -118,7 +118,7 @@ export default function AnalyticsKPIs() {
                 setKpiData({
                     totalEmployees,
                     totalPayroll,
-                    onLeaveToday,
+                    onLeaveToday: onLeaveIds.size,
                     absentToday
                 });
             } catch (error) {
