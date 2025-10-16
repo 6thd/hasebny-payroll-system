@@ -22,9 +22,11 @@ export default function AdminDashboard({
   return (
     <div className="mt-6">
       {activeView === 'analytics' ? (
-        <AdminAnalytics workers={workers} isAdmin={isAdmin} />
+        <div className="animate-in fade-in-50 duration-500">
+          <AdminAnalytics workers={workers} isAdmin={isAdmin} />
+        </div>
       ) : (
-        <div className="bg-card p-4 rounded-xl shadow-lg">
+        <div className="bg-card p-4 rounded-xl shadow-lg animate-in fade-in-50 duration-500">
           <AttendanceTable
             workers={workers}
             year={date.year}
