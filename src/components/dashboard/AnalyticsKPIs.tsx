@@ -9,8 +9,8 @@ import { Worker, MonthlyData } from '@/types';
 import { calculatePayroll } from '@/lib/utils';
 import LoadingSpinner from '../LoadingSpinner';
 
-const KPICard = ({ title, value, icon, isLoading }: { title: string; value: string | number; icon: React.ReactNode, isLoading: boolean }) => (
-  <Card className="shadow-lg transition-all hover:shadow-xl hover:shadow-primary/20 hover:scale-105 border-l-4 border-primary">
+const KPICard = ({ title, value, icon, isLoading, brandColor }: { title: string; value: string | number; icon: React.ReactNode, isLoading: boolean, brandColor: string }) => (
+  <Card className={`shadow-lg transition-all hover:shadow-xl hover:shadow-${brandColor}/20 hover:scale-105 border-t-4 ${brandColor}`}>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       {icon}
@@ -142,24 +142,28 @@ export default function AnalyticsKPIs() {
                 value={kpiData.totalEmployees} 
                 icon={<Users className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
+                brandColor="border-chart-1"
             />
             <KPICard 
                 title="إجمالي الرواتب (الشهر)" 
                 value={`${kpiData.totalPayroll.toLocaleString('ar-SA', { style: 'currency', currency: 'SAR' }).replace('ر.س.', 'ريال')}`}
                 icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
+                brandColor="border-chart-2"
             />
             <KPICard 
                 title="في إجازة اليوم" 
                 value={kpiData.onLeaveToday} 
                 icon={<UserCheck className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
+                brandColor="border-chart-4"
             />
             <KPICard 
                 title="غياب اليوم" 
                 value={kpiData.absentToday} 
                 icon={<UserX className="h-5 w-5 text-muted-foreground" />}
                 isLoading={loading}
+                brandColor="border-destructive"
             />
         </div>
     );
