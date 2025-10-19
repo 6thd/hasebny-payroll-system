@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -227,6 +228,9 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
                  <p className="text-sm text-muted-foreground pt-4 border-t">ملاحظة: العمولات والسلف والجزاءات يتم إدخالها من شاشة مسير الرواتب لكل شهر على حدة.</p>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="submit">{isEditing ? 'حفظ التعديلات' : 'إضافة موظف'}</Button>
+                   {isEditing && formData.status !== 'Terminated' && (
+                        <Button type="button" variant="destructive" onClick={() => handleOpenEOSModal(formData as Worker)}>إنهاء خدمة</Button>
+                    )}
                 </div>
               </form>
             </ScrollArea>
