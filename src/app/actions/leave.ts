@@ -1,235 +1,151 @@
-
 'use server';
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, where, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, collectionGroup, doc, getDoc, getDocs, query, where, writeBatch, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { z } from 'zod';
+import type { LeaveSettlementCalculation, LeavePolicy, Worker, LeaveRequest } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { calculateLeaveBalance } from './leave-balance';
 
-const leaveRequestSchema = z.object({
-  employeeId: z.string(),
-  employeeName: z.string(),
-  leaveType: z.string(),
-  startDate: z.date(),
-  endDate: z.date(),
-  notes: z.string().optional(),
-});
+// =============================================================================
+// SHARED CONFIGURATION
+// =============================================================================
 
-type LeaveRequestData = z.infer<typeof leaveRequestSchema>;
+const defaultLeavePolicy: LeavePolicy = {
+  accrualBasis: 'daily',
+  includeWeekendsInAccrual: true, 
+  excludeUnpaidLeaveFromAccrual: true,
+  annualEntitlementBefore5Y: 21,
+  annualEntitlementAfter5Y: 30,
+};
 
-export async function submitLeaveRequest(data: LeaveRequestData) {
-  const validation = leaveRequestSchema.safeParse(data);
+// =============================================================================
+// LEAVE SETTLEMENT FUNCTIONS
+// =============================================================================
 
-  if (!validation.success) {
-    return {
-      success: false,
-      error: validation.error.flatten().fieldErrors,
-    };
-  }
-
+/**
+ * Calculates the leave settlement for a given worker based on their service history and company policy.
+ */
+export async function calculateLeaveSettlement(workerId: string, lastApprovedLeaveDate?: string): Promise<LeaveSettlementCalculation | { error: string }> {
   try {
-    await addDoc(collection(db, 'leaveRequests'), {
-      ...validation.data,
-      status: 'pending', 
-      createdAt: serverTimestamp(),
-    });
+    const workerRef = doc(db, 'workers', workerId);
+    const workerSnap = await getDoc(workerRef);
+    if (!workerSnap.exists()) { return { error: 'Worker not found.' }; }
 
-    revalidatePath('/'); 
-    revalidatePath('/settlements');
-    // Dispatch a custom event that client components can listen to
-    // This is a pattern to trigger client-side refetches.
-    // We will use a more direct approach if this doesn't work.
+    const worker = workerSnap.data() as Worker;
+    const policy = defaultLeavePolicy;
+    const serviceYears = (new Date().getTime() - new Date(worker.hireDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    const annualEntitlement = serviceYears >= 5 ? policy.annualEntitlementAfter5Y : policy.annualEntitlementBefore5Y;
+    const periodStartDate = lastApprovedLeaveDate ? new Date(lastApprovedLeaveDate) : new Date(worker.hireDate);
+    const periodEndDate = new Date();
+    const daysCounted = (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24);
+    const accruedDays = (daysCounted / 365.25) * annualEntitlement;
+    const dailyRate = worker.salaryDetails.baseSalary / 30;
+    const monetaryValue = accruedDays * dailyRate;
 
-    return { success: true };
-  } catch (error) {
-    console.error('Error submitting leave request:', error);
     return {
-      success: false,
-      error: 'حدث خطأ أثناء إرسال الطلب.',
+      workerId, workerName: worker.name, calculationDate: new Date().toISOString(), accruedDays, monetaryValue,
+      calculationBasis: {
+        serviceYears, annualEntitlement, periodStartDate: periodStartDate.toISOString().split('T')[0], 
+        periodEndDate: periodEndDate.toISOString().split('T')[0], daysCounted, dailyRate, policy,
+      },
     };
+  } catch (error: any) {
+    console.error('Error in calculateLeaveSettlement:', error);
+    return { error: error.message || 'An unknown error occurred during calculation.' };
   }
 }
 
-async function createNotification(employeeId: string, message: string) {
-  try {
-    await addDoc(collection(db, 'notifications'), {
-      employeeId,
-      message,
-      read: false,
-      createdAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Error creating notification:', error);
-    // We don't want to fail the whole operation if notification fails
-  }
-}
-
-export async function approveLeaveRequest(requestId: string, overrideBalanceCheck: boolean = false, newStartDate?: Date, newEndDate?: Date) {
-    try {
-        const requestRef = doc(db, 'leaveRequests', requestId);
-        const requestSnap = await getDoc(requestRef);
-
-        if (!requestSnap.exists()) {
-            return { success: false, error: 'لم يتم العثور على الطلب.' };
-        }
-        
-        const leaveData = requestSnap.data();
-        const { employeeId, leaveType } = leaveData;
-        
-        const start = newStartDate || leaveData.startDate.toDate();
-        const end = newEndDate || leaveData.endDate.toDate();
-
-        if (end < start) {
-            return { success: false, error: 'تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء.' };
-        }
-
-        // --- Start of Leave Balance Check (REVISED LOGIC) ---
-        if ((leaveType === 'annual' || leaveType === 'emergency') && !overrideBalanceCheck) {
-            const balanceResult = await calculateLeaveBalance({ employeeId });
-            
-            if (!balanceResult.success) {
-                return { success: false, error: balanceResult.error };
-            }
-
-            const availableBalance = balanceResult.data.accruedDays;
-            const newLeaveDuration = (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1;
-
-            if (newLeaveDuration > availableBalance) {
-                 await updateDoc(requestRef, {
-                    status: 'rejected',
-                    reviewedAt: serverTimestamp(),
-                    notes: `تم الرفض تلقائيًا لعدم وجود رصيد إجازات كافٍ. الرصيد المتاح: ${availableBalance.toFixed(2)} يوم.`
-                });
-                await createNotification(
-                    employeeId,
-                    `تم رفض طلب الإجازة الخاص بك لعدم كفاية الرصيد. الرصيد المتاح: ${availableBalance.toFixed(2)} يوم.`
-                );
-                revalidatePath('/');
-                revalidatePath('/settlements');
-                return { success: false, error: `رصيد الموظف غير كافٍ (${availableBalance.toFixed(2)} يوم). تم رفض الطلب تلقائيًا.` };
-            }
-        }
-        // --- End of Leave Balance Check ---
-
-
-        // Update attendance records
-        const batch = writeBatch(db);
-
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const year = d.getFullYear();
-            const month = d.getMonth() + 1;
-            const day = d.getDate();
-            const attendanceDocRef = doc(db, `attendance_${year}_${month}`, employeeId);
-
-            const fieldPath = `days.${day}`;
-            batch.set(attendanceDocRef, {
-                days: {
-                    [day]: {
-                        status: leaveType === 'sick' ? 'sick_leave' : leaveType === 'emergency' ? 'annual_leave' : 'annual_leave'
-                    }
-                }
-            }, { merge: true });
-        }
-
-        // Update leave request status
-        const finalUpdateData: any = {
-            status: 'approved',
-            reviewedAt: serverTimestamp(),
-        };
-        
-        if (overrideBalanceCheck) {
-            finalUpdateData.notes = 'تمت الموافقة مع تجاوز فحص الرصيد من قبل المدير.';
-        }
-        if (newStartDate) finalUpdateData.startDate = Timestamp.fromDate(newStartDate);
-        if (newEndDate) finalUpdateData.endDate = Timestamp.fromDate(newEndDate);
-
-        batch.update(requestRef, finalUpdateData);
-        
-        await batch.commit();
-        
-        await createNotification(
-            employeeId, 
-            'تمت الموافقة على طلب الإجازة الخاص بك.'
-        );
-
-        revalidatePath('/');
-        revalidatePath('/settlements');
-        return { success: true };
-    } catch (error) {
-        console.error('Error approving leave request:', error);
-        return { success: false, error: 'حدث خطأ أثناء الموافقة على الطلب.' };
-    }
-}
-
-export async function rejectLeaveRequest(requestId: string) {
-    try {
-        const requestRef = doc(db, 'leaveRequests', requestId);
-        const requestSnap = await getDoc(requestRef);
-
-        if (!requestSnap.exists()) {
-            return { success: false, error: 'لم يتم العثور على الطلب.' };
-        }
-
-        await updateDoc(requestRef, {
-            status: 'rejected',
-            reviewedAt: serverTimestamp(),
-        });
-        
-        await createNotification(
-            requestSnap.data().employeeId,
-            'تم رفض طلب الإجازة الخاص بك من قبل الإدارة.'
-        );
-
-        revalidatePath('/');
-        revalidatePath('/settlements');
-        return { success: true };
-    } catch (error) {
-        console.error('Error rejecting leave request:', error);
-        return { success: false, error: 'حدث خطأ أثناء رفض الطلب.' };
-    }
-}
-
-
-// --- New Function to Settle Leave Balance ---
-const SettleLeaveBalanceInputSchema = z.object({
-    employeeId: z.string(),
-    settlementDate: z.date(),
-    results: z.any(), // a bit unsafe, but we trust our own data
-});
-
-
-export async function settleLeaveBalance(input: z.infer<typeof SettleLeaveBalanceInputSchema>) {
-    const validation = SettleLeaveBalanceInputSchema.safeParse(input);
-    if (!validation.success) {
-        return { success: false, error: 'بيانات غير صالحة.' };
-    }
-    
-    const { employeeId, settlementDate, results } = validation.data;
-
+/**
+ * Finalizes a leave settlement, creating a permanent record in the worker's service history.
+ */
+export async function finalizeLeaveSettlement(settlement: LeaveSettlementCalculation): Promise<{ success: boolean, historyId?: string, error?: string }> {
+    if (!settlement) { return { success: false, error: 'Settlement data is missing.' }; }
     try {
         const batch = writeBatch(db);
-
-        const employeeRef = doc(db, 'employees', employeeId);
-        // 1. Update the employee's lastLeaveEndDate to reset the accrual period
-        batch.update(employeeRef, {
-            lastLeaveEndDate: Timestamp.fromDate(settlementDate),
-        });
-
-        // 2. Create a historical record of the settlement
-        const historyRef = doc(collection(employeeRef, 'serviceHistory'));
-        batch.set(historyRef, {
-            type: 'LeaveSettlement',
-            settlementDate,
-            finalizedAt: serverTimestamp(),
-            ...results,
-        });
-
+        const historyRef = doc(collection(db, 'workers', settlement.workerId, 'serviceHistory'));
+        batch.set(historyRef, { type: 'LEAVE_SETTLEMENT', finalizedAt: new Date(), details: settlement });
+        const workerRef = doc(db, 'workers', settlement.workerId);
+        batch.update(workerRef, { 'leaveBalance.lastSettlementDate': new Date().toISOString() });
         await batch.commit();
         revalidatePath('/settlements');
-        return { success: true };
-    } catch (error) {
-        console.error('Error settling leave balance:', error);
-        return { success: false, error: 'حدث خطأ أثناء حفظ بيانات تصفية الإجازة.' };
+        return { success: true, historyId: historyRef.id };
+    } catch (error: any) {
+        console.error('Error in finalizeLeaveSettlement:', error);
+        return { success: false, error: error.message || 'An unknown error occurred during finalization.' };
     }
+}
+
+// =============================================================================
+// LEAVE REQUEST & MANAGEMENT FUNCTIONS
+// =============================================================================
+
+/**
+ * Submits a new leave request for a worker, which is created with a 'pending' status.
+ */
+export async function submitLeaveRequest(formData: { workerId: string; leaveType: string; startDate: string; endDate: string; reason: string; }): Promise<{ success: boolean; error?: string }> {
+    const { workerId, leaveType, startDate, endDate, reason } = formData;
+    if (!workerId || !leaveType || !startDate || !endDate) { return { success: false, error: "Missing required fields." }; }
+    try {
+        const leaveHistoryRef = collection(db, 'workers', workerId, 'leaveHistory');
+        await addDoc(leaveHistoryRef, { type: leaveType, startDate, endDate, reason, status: 'pending', requestedAt: serverTimestamp() });
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error submitting leave request:", error);
+        return { success: false, error: error.message || "An unknown error occurred." };
+    }
+}
+
+/**
+ * Fetches all leave requests across all workers that are currently in 'pending' status.
+ */
+export async function getPendingLeaveRequests(): Promise<(LeaveRequest & { id: string; workerId: string; workerName: string })[]> {
+    const pendingRequests: (LeaveRequest & { id: string; workerId: string; workerName: string })[] = [];
+    try {
+        const workersSnap = await getDocs(collection(db, 'workers'));
+        for (const workerDoc of workersSnap.docs) {
+            const worker = { id: workerDoc.id, ...workerDoc.data() } as Worker;
+            const leaveHistoryQuery = query(collection(db, 'workers', worker.id, 'leaveHistory'), where('status', '==', 'pending'));
+            const leaveHistorySnap = await getDocs(leaveHistoryQuery);
+            leaveHistorySnap.forEach(leaveDoc => {
+                const leaveData = leaveDoc.data();
+                const requestedAt = leaveData.requestedAt?.toDate ? leaveData.requestedAt.toDate().toISOString() : new Date().toISOString();
+                pendingRequests.push({ id: leaveDoc.id, workerId: worker.id, workerName: worker.name, ...(leaveData as LeaveRequest), requestedAt });
+            });
+        }
+        return pendingRequests;
+    } catch (error: any) {
+        console.error("Error fetching pending leave requests:", error);
+        return []; // Return empty array on error
+    }
+}
+
+/**
+ * A generic helper function to update the status of a leave request.
+ */
+async function updateLeaveRequestStatus(workerId: string, leaveId: string, status: 'approved' | 'rejected'): Promise<{ success: boolean; error?: string }> {
+    if (!workerId || !leaveId || !status) { return { success: false, error: "Worker ID, Leave ID, and Status are required." }; }
+    try {
+        const leaveRequestRef = doc(db, 'workers', workerId, 'leaveHistory', leaveId);
+        await updateDoc(leaveRequestRef, { status: status, actionedAt: serverTimestamp() });
+        revalidatePath('/admin');
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error: any) {
+        console.error(`Error updating leave status to ${status}:`, error);
+        return { success: false, error: error.message || "An unknown error occurred." };
+    }
+}
+
+/**
+ * Approves a specific leave request.
+ */
+export async function approveLeaveRequest(workerId: string, leaveId: string): Promise<{ success: boolean; error?: string }> {
+    return updateLeaveRequestStatus(workerId, leaveId, 'approved');
+}
+
+/**
+ * Rejects a specific leave request.
+ */
+export async function rejectLeaveRequest(workerId: string, leaveId: string): Promise<{ success: boolean; error?: string }> {
+    return updateLeaveRequestStatus(workerId, leaveId, 'rejected');
 }

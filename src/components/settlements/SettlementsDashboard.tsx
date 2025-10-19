@@ -14,7 +14,6 @@ import SettlementHistoryTab from './SettlementHistoryTab';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { checkFirebaseConnection, checkNetworkConnectivity } from '@/lib/firebase-utils';
 
 const LEAVE_TYPES_FOR_SETTLEMENT = ["annual", "emergency"] as const;
 
@@ -42,27 +41,10 @@ export default function SettlementsDashboard() {
       return;
     }
     
-    // Check network connectivity first
-    if (!checkNetworkConnectivity()) {
-      console.log("SettlementsDashboard: No network connectivity");
-      setError("لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك بالشبكة.");
-      setLoading(false);
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     
     try {
-      console.log("SettlementsDashboard: Checking Firebase connection");
-      const connectionCheck = await checkFirebaseConnection();
-      if (!connectionCheck.success) {
-        console.log("SettlementsDashboard: Firebase connection failed");
-        setError(`فشل الاتصال بقاعدة البيانات: ${connectionCheck.error}`);
-        setLoading(false);
-        return;
-      }
-      
       console.log("SettlementsDashboard: Fetching EOS data");
       // --- Fetch for End of Service Tab ---
       const eosSnapshot = await getDocs(query(collection(db, "employees"), where("status", "!=", "Terminated")));
@@ -92,7 +74,7 @@ export default function SettlementsDashboard() {
           const req = doc.data();
           const existingDate = approvedLeaveData[req.employeeId];
           const currentStartDate = req.startDate.toDate().toISOString().split('T')[0];
-          if (!existingDate || new Date(currentStartDate) > new Date(existing.Date)) {
+          if (!existingDate || new Date(currentStartDate) > new Date(existingDate)) {
              approvedLeaveData[req.employeeId] = currentStartDate;
           }
       });
@@ -115,7 +97,7 @@ export default function SettlementsDashboard() {
       }
       
       // --- Fetch for History Tab ---
-        const historyQuery = query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc'));
+        const historyQuery = collectionGroup(db, 'serviceHistory');
         const historySnapshot = await getDocs(historyQuery);
         const employeeNames: { [id: string]: string } = {};
         allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
@@ -129,7 +111,7 @@ export default function SettlementsDashboard() {
                 employeeId: employeeId,
                 employeeName: employeeNames[employeeId] || 'موظف غير معروف',
             } as ServiceHistoryItem;
-        });
+        }).sort((a, b) => b.finalizedAt.toMillis() - a.finalizedAt.toMillis());
       setHistory(historyItems);
 
 

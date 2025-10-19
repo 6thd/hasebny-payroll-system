@@ -23,12 +23,10 @@ const SettlementTypeBadge = ({ type }: { type: 'EndOfService' | 'LeaveSettlement
 
 export default function SettlementHistoryTab({ historyItems }: SettlementHistoryTabProps) {
     const formatDate = (timestamp: any) => {
-        if (!timestamp || !timestamp.toDate) return 'N/A';
-        try {
-            return format(timestamp.toDate(), 'PPP p', { locale: arSA });
-        } catch (e) {
-            return 'تاريخ غير صالح';
-        }
+        if (!timestamp) return 'N/A';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        if (isNaN(date.getTime())) return 'تاريخ غير صالح';
+        return format(date, 'PPP p', { locale: arSA });
     };
 
     return (

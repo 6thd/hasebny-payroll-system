@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'Hasebny - نظام الحضور والرواتب',
@@ -38,8 +38,8 @@ export default function RootLayout({
             disableTransitionOnChange
         >
             <AuthProvider>
-            {children}
-            <Toaster />
+              {children}
+              <Toaster richColors />
             </AuthProvider>
         </ThemeProvider>
       </body>
