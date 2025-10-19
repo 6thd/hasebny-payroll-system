@@ -23,6 +23,7 @@ export interface Worker {
   name: string;
   email?: string;
   role: 'admin' | 'employee';
+  companyId?: string; // Added for multitenancy
   department?: string;
   jobTitle?: string;
   shift?: string;
@@ -73,6 +74,7 @@ export interface MonthlyData {
     commission: number;
     advances: number;
     penalties: number;
+    companyId?: string; // Added for multitenancy
 }
 
 
@@ -86,6 +88,7 @@ export interface Employee {
   id: string; // Document ID
   name: string;
   employeeId: string; // Custom employee ID
+  companyId: string; // Added for multitenancy
   jobTitle: string;
   department: string;
   hireDate: string; // ISO 8601 format (YYYY-MM-DD)
@@ -101,6 +104,7 @@ export interface Employee {
 export interface Payslip {
   id: string; // Document ID
   employeeId: string; // Foreign key to 'employees' collection
+  companyId: string; // Added for multitenancy
   month: number; // 1-12
   year: number;
   grossSalary: number;
@@ -120,6 +124,7 @@ export interface LeaveRequest {
   id: string; // Document ID
   employeeId: string;
   employeeName: string;
+  companyId: string; // Added for multitenancy
   leaveType: 'annual' | 'sick' | 'emergency';
   startDate: Timestamp; 
   endDate: Timestamp;
@@ -144,6 +149,7 @@ export interface ServiceHistoryItem {
   type: 'EndOfService' | 'LeaveSettlement';
   finalizedAt: Timestamp;
   employeeId: string;
+  companyId: string; // Added for multitenancy
   employeeName: string;
   // Could have properties from either settlement type
   totalAmount?: number; // From EOS
