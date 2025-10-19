@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Wallet, UserX, UserCheck } from 'lucide-react';
-import { Worker, MonthlyData } from '@/types';
+import { Worker, MonthlyData, LeaveRequest } from '@/types';
 import { calculatePayroll } from '@/lib/utils';
 import LoadingSpinner from '../LoadingSpinner';
 
@@ -39,26 +39,27 @@ export default function AnalyticsKPIs() {
         const fetchKpiData = async () => {
             setLoading(true);
             try {
-                // Fetch all employees
+                // --- 1. Fetch all active employees ---
                 const employeesSnapshot = await getDocs(query(collection(db, 'employees'), where('status', '!=', 'Terminated')));
                 const workers = employeesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Worker));
                 const totalEmployees = workers.length;
+                const employeeIds = workers.map(w => w.id);
 
-                // Calculate total payroll for current month
                 const today = new Date();
                 const year = today.getFullYear();
                 const month = today.getMonth();
-                
+                const dayOfMonth = today.getDate();
+                const isFriday = today.getDay() === 5;
+
+                // --- 2. Calculate total payroll for current month ---
                 let totalPayroll = 0;
                 
-                // Fetch attendance for current month
                 const attendanceSnapshot = await getDocs(collection(db, `attendance_${year}_${month + 1}`));
                 const attendanceData: { [key: string]: any } = {};
                 attendanceSnapshot.forEach(doc => {
                     attendanceData[doc.id] = doc.data().days;
                 });
 
-                // Fetch monthly financials for current month
                 const salaryCollectionName = `salaries_${year}_${month + 1}`;
                 const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
                 const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
@@ -78,41 +79,36 @@ export default function AnalyticsKPIs() {
                     totalPayroll += calculatePayroll(w, year, month).netSalary;
                 });
                 
+                // --- 3. Fetch employees on leave today ---
                 const todayStart = new Date();
                 todayStart.setHours(0,0,0,0);
-                
-                const allLeaveReqs = await getDocs(collection(db, 'leaveRequests'));
-                const approvedLeaves = allLeaveReqs.docs
-                    .map(doc => doc.data())
-                    .filter(leave => leave.status === 'approved');
+                const todayEnd = new Date();
+                todayEnd.setHours(23,59,59,999);
 
-                const onLeaveIds = new Set<string>();
-                 approvedLeaves.forEach(leave => {
-                     const startDate = leave.startDate.toDate();
-                     const endDate = leave.endDate.toDate();
-                     if(startDate <= todayStart && endDate >= todayStart) {
-                         onLeaveIds.add(leave.employeeId);
-                     }
-                });
+                const onLeaveQuery = query(collection(db, 'leaveRequests'), 
+                    where('status', '==', 'approved'),
+                    where('startDate', '<=', Timestamp.fromDate(todayEnd)),
+                    where('endDate', '>=', Timestamp.fromDate(todayStart))
+                );
+
+                const onLeaveSnapshot = await getDocs(onLeaveQuery);
+                const onLeaveIds = new Set(onLeaveSnapshot.docs.map(doc => doc.data().employeeId));
 
 
-                // Fetch absent employees today
-                const dayOfMonth = today.getDate();
-                const isFriday = today.getDay() === 5;
+                // --- 4. Fetch absent employees today ---
                 let absentToday = 0;
-
                 if (!isFriday) {
-                    const employeeIds = workers.map(w => w.id);
-
-                    const attendedIds = new Set<string>();
+                    const attendedTodayIds = new Set<string>();
                     attendanceSnapshot.forEach(doc => {
                         const dayData = doc.data().days?.[dayOfMonth];
-                        if (dayData?.status === 'present') {
-                           attendedIds.add(doc.id);
+                        // An employee is considered "attended" if they have ANY status for the day other than absent
+                        if (dayData && dayData.status !== 'absent') {
+                           attendedTodayIds.add(doc.id);
                         }
                     });
-
-                    absentToday = employeeIds.filter(id => !attendedIds.has(id) && !onLeaveIds.has(id)).length;
+                    
+                    // An employee is absent if they are not on leave and have not attended.
+                    absentToday = employeeIds.filter(id => !onLeaveIds.has(id) && !attendedTodayIds.has(id)).length;
                 }
                 
                 setKpiData({
