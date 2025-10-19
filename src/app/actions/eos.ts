@@ -6,6 +6,7 @@ import { collection, getDocs, query, where, doc, writeBatch, serverTimestamp } f
 import { db } from '@/lib/firebase';
 import type { Worker } from '@/types';
 import { calculateLeaveBalance } from './leave-balance';
+import { calcEOSB } from '@/lib/taxCompliance';
 
 
 const EndOfServiceInputSchema = z.object({
@@ -51,16 +52,9 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   const serviceDurationYears = serviceDurationInDays / 365.25;
 
   const totalSalary = (worker.basicSalary || 0) + (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0);
-  const halfMonthSalary = totalSalary / 2;
-  const fullMonthSalary = totalSalary;
-
-  let baseGratuity = 0;
-  if (serviceDurationYears > 5) {
-    baseGratuity += 5 * halfMonthSalary;
-    baseGratuity += (serviceDurationYears - 5) * fullMonthSalary;
-  } else {
-    baseGratuity += serviceDurationYears * halfMonthSalary;
-  }
+  
+  // Use the centralized calcEOSB function
+  const baseGratuity = calcEOSB(totalSalary, serviceDurationYears);
 
   let finalGratuity = 0;
   

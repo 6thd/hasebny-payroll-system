@@ -15,6 +15,15 @@ export async function getNitaqatStatus() {
 }
 
 export function calcEOSB(salary: number, years: number) {
-  if (years < 5) return salary/2 * years;
-  return ((salary/2 * 5) + (salary * (years-5)));
+  if (years < 2) return 0; // No gratuity for less than 2 years of service
+  
+  let gratuity = 0;
+  if (years <= 5) {
+    // Half month's salary for each of the first five years
+    gratuity = (salary / 2) * years;
+  } else {
+    // Half month's salary for the first 5 years + one month's salary for subsequent years
+    gratuity = (salary / 2) * 5 + salary * (years - 5);
+  }
+  return gratuity;
 }
