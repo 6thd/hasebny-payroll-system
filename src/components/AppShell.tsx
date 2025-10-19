@@ -21,13 +21,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return <LoadingSpinner fullScreen />;
   }
 
-  // After loading, if there's a user, render the children.
-  // The useEffect above will handle redirection for non-users.
-  if (user) {
-    return <>{children}</>;
+  // After loading, if there's no user, we are in the process of redirecting.
+  // Return null to avoid rendering anything while the redirect happens.
+  if (!user) {
+    return null;
   }
   
-  // While redirecting or if there's no user, return null to avoid any flicker.
-  // The spinner is only shown during the initial auth check.
-  return null;
+  // If loading is finished and there is a user, render the children.
+  return <>{children}</>;
 }
