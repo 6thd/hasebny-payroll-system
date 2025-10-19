@@ -1,25 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { History } from 'lucide-react';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
+import { LeaveRequest } from '@/types';
 
-
-interface LeaveRequest {
-    id: string;
-    leaveType: string;
-    startDate: Timestamp;
-    endDate: Timestamp;
-    status: 'pending' | 'approved' | 'rejected';
-    createdAt: Timestamp;
-}
 
 const leaveTypeMap: { [key: string]: string } = {
     annual: 'سنوية',
@@ -41,7 +33,6 @@ interface EmployeeLeaveHistoryProps {
 export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistoryProps) {
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const { toast } = useToast();
 
     const fetchRequests = useCallback(async () => {
         if (!employeeId) return;
@@ -49,21 +40,19 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
         try {
             const q = query(
                 collection(db, 'leaveRequests'), 
-                where('employeeId', '==', employeeId)
+                where('employeeId', '==', employeeId),
+                orderBy('createdAt', 'desc')
             );
             const querySnapshot = await getDocs(q);
             const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-            
-            fetchedRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-
             setRequests(fetchedRequests);
         } catch (error) {
             console.error("Error fetching leave history:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من جلب سجل طلبات الإجازة.", variant: "destructive" });
+            toast.error("خطأ", { description: "لم نتمكن من جلب سجل طلبات الإجازة." });
         } finally {
             setLoading(false);
         }
-    }, [employeeId, toast]);
+    }, [employeeId]);
 
     useEffect(() => {
         const handleDataUpdate = () => fetchRequests();

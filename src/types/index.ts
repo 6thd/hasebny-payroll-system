@@ -114,10 +114,12 @@ export interface Payslip {
 
 /**
  * Represents a leave request from an employee.
- * Stored in a subcollection 'leaveRequests' under an employee document.
+ * Stored in the top-level 'leaveRequests' collection.
  */
 export interface LeaveRequest {
   id: string; // Document ID
+  employeeId: string;
+  employeeName: string;
   leaveType: 'annual' | 'sick' | 'emergency';
   startDate: Timestamp; 
   endDate: Timestamp;
@@ -126,6 +128,7 @@ export interface LeaveRequest {
   createdAt: Timestamp;
   reviewedBy?: string; // Admin/Manager UID
   reviewedAt?: Timestamp;
+  actionedAt?: Timestamp;
 }
 
 export interface EndOfServiceResult {

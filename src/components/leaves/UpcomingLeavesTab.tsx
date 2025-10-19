@@ -7,14 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
-
-interface LeaveRequest {
-    id: string;
-    employeeName: string;
-    leaveType: string;
-    startDate: Timestamp;
-    endDate: Timestamp;
-}
+import { LeaveRequest } from '@/types';
 
 const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
     annual: { label: 'سنوية', variant: 'secondary' },

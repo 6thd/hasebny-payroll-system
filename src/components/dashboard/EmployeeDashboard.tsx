@@ -13,7 +13,7 @@ import { FilePlus2, Loader2 } from 'lucide-react';
 import EmployeeLeaveHistory from './EmployeeLeaveHistory';
 import { calculateLeaveBalance } from '@/app/actions/leave-balance';
 import { submitLeaveRequest } from '@/app/actions/leave';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 
 interface EmployeeDashboardProps {
@@ -44,7 +44,6 @@ interface LeaveModalState {
 export default function EmployeeDashboard({ employee, year, month, onDateChange, onDataUpdate }: EmployeeDashboardProps) {
   const [leaveModalState, setLeaveModalState] = useState<LeaveModalState>({ isOpen: false, isLoading: false, balance: null });
   const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
-  const { toast } = useToast();
   const { user } = useAuth();
   
   if (!employee) {
@@ -62,11 +61,11 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
           if (result.success) {
               setLeaveModalState(prevState => ({ ...prevState, isLoading: false, balance: result.data.accruedDays }));
           } else {
-              toast({ title: "خطأ", description: result.error, variant: "destructive" });
+              toast.error("خطأ", { description: result.error });
               setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
           }
       } catch (error) {
-          toast({ title: "خطأ", description: "لم نتمكن من جلب رصيد الإجازات.", variant: "destructive" });
+          toast.error("خطأ", { description: "لم نتمكن من جلب رصيد الإجازات." });
           setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
       }
   };
@@ -77,21 +76,23 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
 
   const handleLeaveSubmit = async (data: LeaveRequestFormValues) => {
     if (!user) {
-      toast({ title: "خطأ", description: "يجب أن تكون مسجلاً لتقديم طلب.", variant: "destructive" });
+      toast.error("خطأ", { description: "يجب أن تكون مسجلاً لتقديم طلب." });
       return;
     }
 
     setIsSubmittingLeave(true);
     const result = await submitLeaveRequest({
       ...data,
+      startDate: data.startDate,
+      endDate: data.endDate,
       employeeId: user.id,
       employeeName: user.name || user.email || 'غير معروف',
+      leaveType: data.leaveType,
     });
     setIsSubmittingLeave(false);
 
     if (result.success) {
-      toast({
-        title: "تم إرسال الطلب",
+      toast.success("تم إرسال الطلب", {
         description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
       });
       handleCloseLeaveModal();
@@ -102,10 +103,8 @@ export default function EmployeeDashboard({ employee, year, month, onDateChange,
         ? result.error
         : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.";
       
-      toast({
-        title: "خطأ",
+      toast.error("خطأ", {
         description: errorMessage,
-        variant: "destructive",
       });
     }
   };

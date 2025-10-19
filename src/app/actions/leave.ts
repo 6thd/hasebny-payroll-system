@@ -1,9 +1,10 @@
 'use server';
 
-import { collection, collectionGroup, doc, getDoc, getDocs, query, where, writeBatch, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, writeBatch, addDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { LeaveSettlementCalculation, LeavePolicy, Worker, LeaveRequest } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { calculateLeaveBalance } from './leave-balance';
 
 // =============================================================================
 // SHARED CONFIGURATION
@@ -11,7 +12,7 @@ import { revalidatePath } from 'next/cache';
 
 const defaultLeavePolicy: LeavePolicy = {
   accrualBasis: 'daily',
-  includeWeekendsInAccrual: true, 
+  includeWeekendsInAccrual: true,
   excludeUnpaidLeaveFromAccrual: true,
   annualEntitlementBefore5Y: 21,
   annualEntitlementAfter5Y: 30,
@@ -78,16 +79,37 @@ export async function finalizeLeaveSettlement(settlement: LeaveSettlementCalcula
 // LEAVE REQUEST & MANAGEMENT FUNCTIONS
 // =============================================================================
 
+interface SubmitLeaveRequestData {
+  employeeId: string;
+  employeeName: string;
+  leaveType: string;
+  startDate: Date;
+  endDate: Date;
+  notes?: string;
+}
+
 /**
- * Submits a new leave request for a worker, which is created with a 'pending' status.
+ * Submits a new leave request for a worker, which is created with a 'pending' status in a centralized collection.
  */
-export async function submitLeaveRequest(formData: { workerId: string; leaveType: string; startDate: string; endDate: string; reason: string; }): Promise<{ success: boolean; error?: string }> {
-    const { workerId, leaveType, startDate, endDate, reason } = formData;
-    if (!workerId || !leaveType || !startDate || !endDate) { return { success: false, error: "Missing required fields." }; }
+export async function submitLeaveRequest(formData: SubmitLeaveRequestData): Promise<{ success: boolean; error?: string }> {
+    const { employeeId, employeeName, leaveType, startDate, endDate, notes } = formData;
+    if (!employeeId || !employeeName || !leaveType || !startDate || !endDate) { return { success: false, error: "Missing required fields." }; }
+    
     try {
-        const leaveHistoryRef = collection(db, 'employees', workerId, 'leaveHistory');
-        await addDoc(leaveHistoryRef, { type: leaveType, startDate, endDate, reason, status: 'pending', requestedAt: serverTimestamp() });
+        const leaveRequestRef = collection(db, 'leaveRequests');
+        await addDoc(leaveRequestRef, {
+            employeeId,
+            employeeName,
+            leaveType,
+            startDate: Timestamp.fromDate(startDate),
+            endDate: Timestamp.fromDate(endDate),
+            notes: notes || "",
+            status: 'pending',
+            createdAt: serverTimestamp()
+        });
         revalidatePath('/dashboard');
+        revalidatePath('/leaves');
+        revalidatePath('/profile');
         return { success: true };
     } catch (error: any) {
         console.error("Error submitting leave request:", error);
@@ -96,40 +118,71 @@ export async function submitLeaveRequest(formData: { workerId: string; leaveType
 }
 
 /**
- * Fetches all leave requests across all workers that are currently in 'pending' status.
- */
-export async function getPendingLeaveRequests(): Promise<(LeaveRequest & { id: string; workerId: string; workerName: string })[]> {
-    const pendingRequests: (LeaveRequest & { id: string; workerId: string; workerName: string })[] = [];
-    try {
-        const workersSnap = await getDocs(collection(db, 'employees'));
-        for (const workerDoc of workersSnap.docs) {
-            const worker = { id: workerDoc.id, ...workerDoc.data() } as Worker;
-            const leaveHistoryQuery = query(collection(db, 'employees', worker.id, 'leaveHistory'), where('status', '==', 'pending'));
-            const leaveHistorySnap = await getDocs(leaveHistoryQuery);
-            leaveHistorySnap.forEach(leaveDoc => {
-                const leaveData = leaveDoc.data();
-                const requestedAt = leaveData.requestedAt?.toDate ? leaveData.requestedAt.toDate().toISOString() : new Date().toISOString();
-                pendingRequests.push({ id: leaveDoc.id, workerId: worker.id, workerName: worker.name, ...(leaveData as LeaveRequest), requestedAt });
-            });
-        }
-        return pendingRequests;
-    } catch (error: any) {
-        console.error("Error fetching pending leave requests:", error);
-        return []; // Return empty array on error
-    }
-}
-
-/**
  * A generic helper function to update the status of a leave request.
  */
-async function updateLeaveRequestStatus(workerId: string, leaveId: string, status: 'approved' | 'rejected'): Promise<{ success: boolean; error?: string }> {
-    if (!workerId || !leaveId || !status) { return { success: false, error: "Worker ID, Leave ID, and Status are required." }; }
+async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'rejected', newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string; leaveRequest?: LeaveRequest }> {
+    if (!leaveId || !status) { return { success: false, error: "Leave ID and Status are required." }; }
+    
     try {
-        const leaveRequestRef = doc(db, 'employees', workerId, 'leaveHistory', leaveId);
-        await updateDoc(leaveRequestRef, { status: status, actionedAt: serverTimestamp() });
-        revalidatePath('/admin');
+        const leaveRequestRef = doc(db, 'leaveRequests', leaveId);
+        
+        const updateData: { status: 'approved' | 'rejected'; actionedAt: Timestamp; startDate?: Timestamp; endDate?: Timestamp } = {
+            status: status,
+            actionedAt: serverTimestamp()
+        };
+
+        if (newStartDate) {
+            updateData.startDate = Timestamp.fromDate(newStartDate);
+        }
+        if (newEndDate) {
+            updateData.endDate = Timestamp.fromDate(newEndDate);
+        }
+        
+        await updateDoc(leaveRequestRef, updateData);
+
+        const updatedDoc = await getDoc(leaveRequestRef);
+        const leaveRequest = { id: updatedDoc.id, ...updatedDoc.data() } as LeaveRequest;
+
+        // If approved, update the attendance table
+        if (status === 'approved') {
+            const startDate = (updateData.startDate || leaveRequest.startDate).toDate();
+            const endDate = (updateData.endDate || leaveRequest.endDate).toDate();
+            const employeeId = leaveRequest.employeeId;
+
+            // This logic is complex because it can span across months.
+            // For now, we'll focus on the current month as an example.
+            // A robust solution would use a Cloud Function to handle this transactionally.
+            
+            const attendanceUpdates: { [key: string]: any } = {};
+            
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const year = d.getFullYear();
+                const month = d.getMonth() + 1;
+                const day = d.getDate();
+                const attendanceDocRef = doc(db, `attendance_${year}_${month}`, employeeId);
+
+                if (!attendanceUpdates[attendanceDocRef.path]) {
+                    const docSnap = await getDoc(attendanceDocRef);
+                    attendanceUpdates[attendanceDocRef.path] = docSnap.exists() ? docSnap.data().days : {};
+                }
+
+                attendanceUpdates[attendanceDocRef.path][day] = {
+                    status: leaveRequest.leaveType === 'sick' ? 'sick_leave' : 'annual_leave'
+                };
+            }
+
+            const batch = writeBatch(db);
+            for(const path in attendanceUpdates) {
+                const ref = doc(db, path);
+                batch.set(ref, { days: attendanceUpdates[path] }, { merge: true });
+            }
+            await batch.commit();
+        }
+
         revalidatePath('/dashboard');
-        return { success: true };
+        revalidatePath('/leaves');
+        
+        return { success: true, leaveRequest };
     } catch (error: any) {
         console.error(`Error updating leave status to ${status}:`, error);
         return { success: false, error: error.message || "An unknown error occurred." };
@@ -138,14 +191,35 @@ async function updateLeaveRequestStatus(workerId: string, leaveId: string, statu
 
 /**
  * Approves a specific leave request.
+ * Optionally allows overriding balance checks and modifying dates.
  */
-export async function approveLeaveRequest(workerId: string, leaveId: string): Promise<{ success: boolean; error?: string }> {
-    return updateLeaveRequestStatus(workerId, leaveId, 'approved');
+export async function approveLeaveRequest(leaveId: string, overrideBalanceCheck: boolean, newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string }> {
+    const leaveRequestRef = doc(db, 'leaveRequests', leaveId);
+    const leaveRequestSnap = await getDoc(leaveRequestRef);
+    if (!leaveRequestSnap.exists()) {
+        return { success: false, error: "Leave request not found." };
+    }
+    const leaveRequest = leaveRequestSnap.data() as LeaveRequest;
+
+    if (!overrideBalanceCheck) {
+        const balanceResult = await calculateLeaveBalance({ employeeId: leaveRequest.employeeId });
+        if (balanceResult.success) {
+            const requestedDays = ( (newEndDate || leaveRequest.endDate.toDate()).getTime() - (newStartDate || leaveRequest.startDate.toDate()).getTime() ) / (1000 * 3600 * 24) + 1;
+            if (balanceResult.data.accruedDays < requestedDays) {
+                return { success: false, error: `رصيد الإجازات غير كافٍ. الرصيد المتاح: ${balanceResult.data.accruedDays.toFixed(2)} يوم.` };
+            }
+        } else {
+            // If balance check fails, return error but allow admin to override
+            return { success: false, error: `فشل التحقق من رصيد الإجازات: ${balanceResult.error}` };
+        }
+    }
+
+    return updateLeaveRequestStatus(leaveId, 'approved', newStartDate, newEndDate);
 }
 
 /**
  * Rejects a specific leave request.
  */
-export async function rejectLeaveRequest(workerId: string, leaveId: string): Promise<{ success: boolean; error?: string }> {
-    return updateLeaveRequestStatus(workerId, leaveId, 'rejected');
+export async function rejectLeaveRequest(leaveId: string): Promise<{ success:boolean; error?: string }> {
+    return updateLeaveRequestStatus(leaveId, 'rejected');
 }

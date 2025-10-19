@@ -9,16 +9,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
-
-interface LeaveRequest {
-    id: string;
-    employeeName: string;
-    leaveType: string;
-    startDate: Timestamp;
-    endDate: Timestamp;
-    status: 'approved' | 'rejected' | 'pending';
-    createdAt: Timestamp;
-}
+import { LeaveRequest } from '@/types';
 
 const leaveTypeMap: { [key: string]: string } = {
     annual: 'سنوية',

@@ -1,23 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
 import { UserCheck, CalendarClock, UserX } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { LeaveRequest } from '@/types';
 
-interface LeaveRequest {
-    id: string;
-    employeeName: string;
-    leaveType: string;
-    startDate: Timestamp;
-    endDate: Timestamp;
-    status: 'pending' | 'approved' | 'rejected';
-}
 
 const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
     annual: { label: 'سنوية', variant: 'secondary' },
@@ -59,7 +52,6 @@ export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
     const [onLeave, setOnLeave] = useState<LeaveRequest[]>([]);
     const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const { toast } = useToast();
 
     const fetchOnLeaveEmployees = useCallback(async () => {
         setLoading(true);
@@ -67,16 +59,15 @@ export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            const q = query(collection(db, 'leaveRequests'));
+            const q = query(collection(db, 'leaveRequests'), where('status', '==', 'approved'), orderBy('startDate', 'asc'));
 
             const querySnapshot = await getDocs(q);
             const allLeaves = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-            const approvedLeaves = allLeaves.filter(leave => leave.status === 'approved');
-
+            
             const active: LeaveRequest[] = [];
             const upcoming: LeaveRequest[] = [];
             
-            approvedLeaves.forEach(leave => {
+            allLeaves.forEach(leave => {
                 const startDate = leave.startDate.toDate();
                 const endDate = leave.endDate.toDate();
                 endDate.setHours(23, 59, 59, 999); 
@@ -90,19 +81,16 @@ export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
                 }
             });
             
-            active.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
-            upcoming.sort((a,b) => a.startDate.toMillis() - b.startDate.toMillis());
-
             setOnLeave(active);
             setUpcomingLeaves(upcoming);
 
         } catch (error) {
             console.error("Error fetching employees on leave:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من جلب بيانات الموظفين المجازين.", variant: "destructive" });
+            toast.error("خطأ", { description: "لم نتمكن من جلب بيانات الموظفين المجازين." });
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, []);
 
     useEffect(() => {
         const handleDataUpdate = () => fetchOnLeaveEmployees();
