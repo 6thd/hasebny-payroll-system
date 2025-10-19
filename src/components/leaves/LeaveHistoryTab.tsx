@@ -1,8 +1,5 @@
 "use client";
 
-import { collection, query, where, Timestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useFirestoreListener } from '@/hooks/use-firestore-listener';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
@@ -10,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 import { LeaveRequest } from '@/types';
+import { Timestamp } from 'firebase/firestore';
 
 const leaveTypeMap: { [key: string]: string } = {
     annual: 'سنوية',
@@ -23,16 +21,12 @@ const statusMap: { [key: string]: { label: string; variant: "default" | "seconda
     rejected: { label: 'مرفوضة', variant: 'destructive' },
 };
 
-export default function LeaveHistoryTab() {
-    const { data: requests, loading } = useFirestoreListener<LeaveRequest>({
-        query: query(
-            collection(db, 'leaveRequests'),
-            where('status', 'in', ['approved', 'rejected']),
-            orderBy('status', 'asc'),
-            orderBy('createdAt', 'desc')
-        ),
-    });
+interface LeaveHistoryTabProps {
+    requests: LeaveRequest[];
+    loading: boolean;
+}
 
+export default function LeaveHistoryTab({ requests, loading }: LeaveHistoryTabProps) {
     const formatDate = (timestamp: Timestamp) => {
         if (!timestamp) return 'N/A';
         return format(timestamp.toDate(), 'P', { locale: arSA });

@@ -1,9 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, Timestamp, where, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '../LoadingSpinner';
 import { Badge } from '../ui/badge';
@@ -45,60 +41,12 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
 );
 
 interface EmployeesOnLeaveProps {
-    onAction?: () => void;
+    activeLeaves: LeaveRequest[];
+    upcomingLeaves: LeaveRequest[];
+    loading: boolean;
 }
 
-export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
-    const [onLeave, setOnLeave] = useState<LeaveRequest[]>([]);
-    const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveRequest[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    const fetchOnLeaveEmployees = useCallback(async () => {
-        setLoading(true);
-        try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const q = query(collection(db, 'leaveRequests'), where('status', '==', 'approved'), orderBy('startDate', 'asc'));
-
-            const querySnapshot = await getDocs(q);
-            const allLeaves = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-            
-            const active: LeaveRequest[] = [];
-            const upcoming: LeaveRequest[] = [];
-            
-            allLeaves.forEach(leave => {
-                const startDate = leave.startDate.toDate();
-                const endDate = leave.endDate.toDate();
-                endDate.setHours(23, 59, 59, 999); 
-
-                if (endDate < today) return; 
-                
-                if (startDate <= today) {
-                    active.push(leave);
-                } else {
-                    upcoming.push(leave);
-                }
-            });
-            
-            setOnLeave(active);
-            setUpcomingLeaves(upcoming);
-
-        } catch (error) {
-            console.error("Error fetching employees on leave:", error);
-            toast.error("خطأ", { description: "لم نتمكن من جلب بيانات الموظفين المجازين." });
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        const handleDataUpdate = () => fetchOnLeaveEmployees();
-        fetchOnLeaveEmployees();
-        window.addEventListener('data-updated', handleDataUpdate);
-        return () => window.removeEventListener('data-updated', handleDataUpdate);
-    }, [fetchOnLeaveEmployees]);
-
+export default function EmployeesOnLeave({ activeLeaves, upcomingLeaves, loading }: EmployeesOnLeaveProps) {
     return (
         <Card className="shadow-lg no-print h-full">
             <CardHeader>
@@ -116,7 +64,7 @@ export default function EmployeesOnLeave({ onAction }: EmployeesOnLeaveProps) {
                     <div className="space-y-6">
                         <LeaveList 
                             title="في إجازة حاليًا" 
-                            leaves={onLeave}
+                            leaves={activeLeaves}
                             icon={<UserX className="h-5 w-5 text-orange-500" />}
                         />
                         <Separator />

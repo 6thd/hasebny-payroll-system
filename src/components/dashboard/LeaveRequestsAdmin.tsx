@@ -2,10 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, where, Timestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
-import { useFirestoreListener } from '@/hooks/use-firestore-listener';
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/actions/leave';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,21 +18,14 @@ const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "seco
     emergency: { label: 'طارئة', variant: 'destructive' },
 };
 
-
 interface LeaveRequestsAdminProps {
-    onAction?: () => void;
-    itemCount?: number;
-    showAll?: boolean;
+    requests: LeaveRequest[];
+    loading: boolean;
+    onAction: () => void;
 }
 
-export default function LeaveRequestsAdmin({ onAction, itemCount = 5, showAll = false }: LeaveRequestsAdminProps) {
+export default function LeaveRequestsAdmin({ requests, loading, onAction }: LeaveRequestsAdminProps) {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-    const { data: requests, loading } = useFirestoreListener<LeaveRequest>({
-        query: query(collection(db, 'leaveRequests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc')),
-        onFetch: (allRequests) => showAll ? allRequests : allRequests.slice(0, itemCount),
-        dependencies: [itemCount, showAll]
-    });
 
     const handleApproval = async (id: string, override: boolean, newStartDate?: Date, newEndDate?: Date) => {
         setActionLoading(id);

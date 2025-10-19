@@ -1,8 +1,5 @@
 "use client";
 
-import { collection, query, where, Timestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useFirestoreListener } from '@/hooks/use-firestore-listener';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '../LoadingSpinner';
@@ -15,19 +12,12 @@ const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "seco
     emergency: { label: 'طارئة', variant: 'destructive' },
 };
 
-export default function UpcomingLeavesTab() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+interface UpcomingLeavesTabProps {
+    leaves: LeaveRequest[];
+    loading: boolean;
+}
 
-    const { data: leaves, loading } = useFirestoreListener<LeaveRequest>({
-        query: query(
-            collection(db, 'leaveRequests'),
-            where('status', '==', 'approved'),
-            where('startDate', '>=', Timestamp.fromDate(today)),
-            orderBy('startDate', 'asc')
-        )
-    });
-
+export default function UpcomingLeavesTab({ leaves, loading }: UpcomingLeavesTabProps) {
     return (
         <Card>
             <CardHeader>
