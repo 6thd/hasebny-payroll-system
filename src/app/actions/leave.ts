@@ -26,7 +26,7 @@ const defaultLeavePolicy: LeavePolicy = {
  */
 export async function calculateLeaveSettlement(workerId: string, lastApprovedLeaveDate?: string): Promise<LeaveSettlementCalculation | { error: string }> {
   try {
-    const workerRef = doc(db, 'workers', workerId);
+    const workerRef = doc(db, 'employees', workerId);
     const workerSnap = await getDoc(workerRef);
     if (!workerSnap.exists()) { return { error: 'Worker not found.' }; }
 
@@ -38,7 +38,7 @@ export async function calculateLeaveSettlement(workerId: string, lastApprovedLea
     const periodEndDate = new Date();
     const daysCounted = (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24);
     const accruedDays = (daysCounted / 365.25) * annualEntitlement;
-    const dailyRate = worker.salaryDetails.baseSalary / 30;
+    const dailyRate = worker.basicSalary / 30;
     const monetaryValue = accruedDays * dailyRate;
 
     return {
@@ -61,9 +61,9 @@ export async function finalizeLeaveSettlement(settlement: LeaveSettlementCalcula
     if (!settlement) { return { success: false, error: 'Settlement data is missing.' }; }
     try {
         const batch = writeBatch(db);
-        const historyRef = doc(collection(db, 'workers', settlement.workerId, 'serviceHistory'));
+        const historyRef = doc(collection(db, 'employees', settlement.workerId, 'serviceHistory'));
         batch.set(historyRef, { type: 'LEAVE_SETTLEMENT', finalizedAt: new Date(), details: settlement });
-        const workerRef = doc(db, 'workers', settlement.workerId);
+        const workerRef = doc(db, 'employees', settlement.workerId);
         batch.update(workerRef, { 'leaveBalance.lastSettlementDate': new Date().toISOString() });
         await batch.commit();
         revalidatePath('/settlements');
@@ -85,7 +85,7 @@ export async function submitLeaveRequest(formData: { workerId: string; leaveType
     const { workerId, leaveType, startDate, endDate, reason } = formData;
     if (!workerId || !leaveType || !startDate || !endDate) { return { success: false, error: "Missing required fields." }; }
     try {
-        const leaveHistoryRef = collection(db, 'workers', workerId, 'leaveHistory');
+        const leaveHistoryRef = collection(db, 'employees', workerId, 'leaveHistory');
         await addDoc(leaveHistoryRef, { type: leaveType, startDate, endDate, reason, status: 'pending', requestedAt: serverTimestamp() });
         revalidatePath('/dashboard');
         return { success: true };
@@ -101,10 +101,10 @@ export async function submitLeaveRequest(formData: { workerId: string; leaveType
 export async function getPendingLeaveRequests(): Promise<(LeaveRequest & { id: string; workerId: string; workerName: string })[]> {
     const pendingRequests: (LeaveRequest & { id: string; workerId: string; workerName: string })[] = [];
     try {
-        const workersSnap = await getDocs(collection(db, 'workers'));
+        const workersSnap = await getDocs(collection(db, 'employees'));
         for (const workerDoc of workersSnap.docs) {
             const worker = { id: workerDoc.id, ...workerDoc.data() } as Worker;
-            const leaveHistoryQuery = query(collection(db, 'workers', worker.id, 'leaveHistory'), where('status', '==', 'pending'));
+            const leaveHistoryQuery = query(collection(db, 'employees', worker.id, 'leaveHistory'), where('status', '==', 'pending'));
             const leaveHistorySnap = await getDocs(leaveHistoryQuery);
             leaveHistorySnap.forEach(leaveDoc => {
                 const leaveData = leaveDoc.data();
@@ -125,7 +125,7 @@ export async function getPendingLeaveRequests(): Promise<(LeaveRequest & { id: s
 async function updateLeaveRequestStatus(workerId: string, leaveId: string, status: 'approved' | 'rejected'): Promise<{ success: boolean; error?: string }> {
     if (!workerId || !leaveId || !status) { return { success: false, error: "Worker ID, Leave ID, and Status are required." }; }
     try {
-        const leaveRequestRef = doc(db, 'workers', workerId, 'leaveHistory', leaveId);
+        const leaveRequestRef = doc(db, 'employees', workerId, 'leaveHistory', leaveId);
         await updateDoc(leaveRequestRef, { status: status, actionedAt: serverTimestamp() });
         revalidatePath('/admin');
         revalidatePath('/dashboard');

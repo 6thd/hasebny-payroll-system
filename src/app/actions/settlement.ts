@@ -10,7 +10,7 @@ import type { Worker, ServiceHistory } from '@/types';
  * This function now correctly preserves the Firestore document ID.
  */
 export async function getEligibleWorkersForLeaveSettlement(): Promise<(Worker & { lastApprovedLeaveDate?: string })[]> {
-    const workersCol = collection(db, 'workers');
+    const workersCol = collection(db, 'employees');
     const workersSnap = await getDocs(workersCol);
     
     // The key fix: We map over the documents, spread the data, and THEN explicitly set the 'id'
@@ -22,7 +22,7 @@ export async function getEligibleWorkersForLeaveSettlement(): Promise<(Worker & 
 
     for (const worker of workersData) {
         const leaveHistoryQuery = query(
-            collection(db, 'workers', worker.id, 'leaveHistory'),
+            collection(db, 'employees', worker.id, 'leaveHistory'),
             orderBy('endDate', 'desc')
         );
         const leaveHistorySnap = await getDocs(leaveHistoryQuery);
