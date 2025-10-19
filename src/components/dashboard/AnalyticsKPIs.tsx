@@ -101,13 +101,13 @@ export default function AnalyticsKPIs() {
                     const attendedTodayIds = new Set<string>();
                     attendanceSnapshot.forEach(doc => {
                         const dayData = doc.data().days?.[dayOfMonth];
-                        // An employee is considered "attended" if they have ANY status for the day other than absent
-                        if (dayData && dayData.status !== 'absent') {
+                        // An employee is considered "attended" if they have ANY status for the day, even just 'present' without hours.
+                        if (dayData) {
                            attendedTodayIds.add(doc.id);
                         }
                     });
                     
-                    // An employee is absent if they are not on leave and have not attended.
+                    // An employee is absent if they are active, not on leave, and have no attendance record for today.
                     absentToday = employeeIds.filter(id => !onLeaveIds.has(id) && !attendedTodayIds.has(id)).length;
                 }
                 
