@@ -43,15 +43,17 @@ export function useFirestoreListener<T>({
     } finally {
       setLoading(false);
     }
-  }, [query, transform, onFetch, toast, ...dependencies]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, ...dependencies]);
 
   useEffect(() => {
     fetchData();
 
     // Listen for a custom event to refetch data
-    window.addEventListener('data-updated', fetchData);
+    const handleDataUpdate = () => fetchData();
+    window.addEventListener('data-updated', handleDataUpdate);
     return () => {
-      window.removeEventListener('data-updated', fetchData);
+      window.removeEventListener('data-updated', handleDataUpdate);
     };
   }, [fetchData]);
 
