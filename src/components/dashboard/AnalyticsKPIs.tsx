@@ -26,7 +26,7 @@ const KPICard = ({ title, value, icon, isLoading, brandColor }: { title: string;
 );
 
 
-export default function AnalyticsKPIs() {
+export default function AnalyticsKPIs({ workers, approvedLeaves }: { workers: Worker[], approvedLeaves: LeaveRequest[] }) {
     const [kpiData, setKpiData] = useState({
         totalEmployees: 0,
         totalPayroll: 0,
@@ -36,14 +36,18 @@ export default function AnalyticsKPIs() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchKpiData = async () => {
+        const calculateKpis = async () => {
             setLoading(true);
             try {
-                // --- 1. Fetch all active employees ---
-                const employeesSnapshot = await getDocs(query(collection(db, 'employees'), where('status', '!=', 'Terminated')));
-                const workers = employeesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Worker));
-                const totalEmployees = workers.length;
-                const employeeIds = workers.map(w => w.id);
+                if (!workers || workers.length === 0) {
+                    setKpiData({ totalEmployees: 0, totalPayroll: 0, onLeaveToday: 0, absentToday: 0 });
+                    return;
+                }
+
+                // --- 1. Total active employees ---
+                const activeWorkers = workers.filter(w => w.status !== 'Terminated');
+                const totalEmployees = activeWorkers.length;
+                const employeeIds = activeWorkers.map(w => w.id);
 
                 const today = new Date();
                 const year = today.getFullYear();
@@ -53,63 +57,34 @@ export default function AnalyticsKPIs() {
 
                 // --- 2. Calculate total payroll for current month ---
                 let totalPayroll = 0;
-                
-                const attendanceSnapshot = await getDocs(collection(db, `attendance_${year}_${month + 1}`));
-                const attendanceData: { [key: string]: any } = {};
-                attendanceSnapshot.forEach(doc => {
-                    attendanceData[doc.id] = doc.data().days;
-                });
-
-                const salaryCollectionName = `salaries_${year}_${month + 1}`;
-                const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
-                const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
-                monthlyDocsSnap.forEach(doc => {
-                    monthlyDataMap[doc.id] = doc.data() as MonthlyData;
-                });
-
-                const workersWithFullData = workers.map(w => ({
-                    ...w,
-                    days: attendanceData[w.id] || {},
-                    commission: monthlyDataMap[w.id]?.commission || 0,
-                    advances: monthlyDataMap[w.id]?.advances || 0,
-                    penalties: monthlyDataMap[w.id]?.penalties || 0,
-                }));
-                
-                workersWithFullData.forEach(w => {
+                activeWorkers.forEach(w => {
                     totalPayroll += calculatePayroll(w, year, month).netSalary;
                 });
                 
-                // --- 3. Fetch employees on leave today ---
+                // --- 3. Calculate employees on leave today from the passed-in prop ---
                 const todayStart = new Date();
                 todayStart.setHours(0, 0, 0, 0);
 
-                const onLeaveQuery = query(
-                  collection(db, 'leaveRequests'),
-                  where('status', '==', 'approved'),
-                  where('endDate', '>=', Timestamp.fromDate(todayStart))
-                );
-                
-                const onLeaveSnapshot = await getDocs(onLeaveQuery);
-
                 const onLeaveIds = new Set<string>();
-                onLeaveSnapshot.docs.forEach(doc => {
-                    const leave = doc.data() as LeaveRequest;
+                approvedLeaves.forEach(leave => {
                     const startDate = leave.startDate.toDate();
-                    if(startDate <= today) {
+                    const endDate = leave.endDate.toDate();
+                    if(startDate <= today && endDate >= todayStart) {
                         onLeaveIds.add(leave.employeeId);
                     }
                 });
-
+                
                 // --- 4. Fetch absent employees today ---
                 let absentToday = 0;
                 if (!isFriday) {
-                    const attendedTodayIds = new Set<string>();
-                    attendanceSnapshot.forEach(doc => {
-                        const dayData = doc.data().days?.[dayOfMonth];
-                        if (dayData && dayData.status !== 'absent') {
-                           attendedTodayIds.add(doc.id);
-                        }
-                    });
+                   const attendedTodayIds = new Set<string>();
+                   activeWorkers.forEach(worker => {
+                       const dayData = worker.days?.[dayOfMonth];
+                       // If there's any status other than absent, consider them attended for this KPI
+                       if (dayData && dayData.status !== 'absent') {
+                           attendedTodayIds.add(worker.id);
+                       }
+                   });
                     
                     // An employee is absent if they are active, not on leave, and have no attendance record for today.
                     absentToday = employeeIds.filter(id => !onLeaveIds.has(id) && !attendedTodayIds.has(id)).length;
@@ -122,17 +97,17 @@ export default function AnalyticsKPIs() {
                     absentToday
                 });
             } catch (error) {
-                console.error("Error fetching KPI data:", error);
+                console.error("Error calculating KPI data:", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        const handleDataUpdate = () => fetchKpiData();
-        fetchKpiData();
+        const handleDataUpdate = () => calculateKpis();
+        calculateKpis();
         window.addEventListener('data-updated', handleDataUpdate);
         return () => window.removeEventListener('data-updated', handleDataUpdate);
-    }, []);
+    }, [workers, approvedLeaves]);
 
 
     return (

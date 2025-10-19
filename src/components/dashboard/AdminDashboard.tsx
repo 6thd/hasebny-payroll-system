@@ -1,6 +1,6 @@
 "use client";
 
-import type { Worker } from '@/types';
+import type { Worker, LeaveRequest } from '@/types';
 import AdminAnalytics from './AdminAnalytics';
 import AttendanceTable from './AttendanceTable';
 
@@ -10,6 +10,7 @@ interface AdminDashboardProps {
   isAdmin: boolean;
   onDataUpdate: () => void;
   activeView: string;
+  approvedLeaves: LeaveRequest[];
 }
 
 export default function AdminDashboard({
@@ -18,12 +19,13 @@ export default function AdminDashboard({
   isAdmin,
   onDataUpdate,
   activeView,
+  approvedLeaves,
 }: AdminDashboardProps) {
   return (
     <div className="mt-6">
       {activeView === 'analytics' ? (
         <div className="animate-in fade-in-50 duration-500">
-          <AdminAnalytics workers={workers} isAdmin={isAdmin} />
+          <AdminAnalytics workers={workers} isAdmin={isAdmin} approvedLeaves={approvedLeaves} />
         </div>
       ) : (
         <div className="bg-card p-4 rounded-xl shadow-lg animate-in fade-in-50 duration-500">

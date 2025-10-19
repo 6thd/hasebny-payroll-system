@@ -1,4 +1,4 @@
-import { Worker } from '@/types';
+import { Worker, LeaveRequest } from '@/types';
 import AnalyticsCharts from "./AnalyticsCharts";
 import AnalyticsKPIs from "./AnalyticsKPIs";
 import AlertsManager from "./AlertsManager";
@@ -6,9 +6,10 @@ import AlertsManager from "./AlertsManager";
 interface AdminAnalyticsProps {
   workers?: Worker[];
   isAdmin?: boolean;
+  approvedLeaves: LeaveRequest[];
 }
 
-export default function AdminAnalytics({ workers = [], isAdmin = true }: AdminAnalyticsProps) {
+export default function AdminAnalytics({ workers = [], isAdmin = true, approvedLeaves }: AdminAnalyticsProps) {
     
     const handleAction = () => {
         // This is a dummy handler for now, can be used to trigger data refetch
@@ -19,7 +20,7 @@ export default function AdminAnalytics({ workers = [], isAdmin = true }: AdminAn
     return (
         <div className="space-y-8">
             <AlertsManager workers={workers} isAdmin={isAdmin} />
-            <AnalyticsKPIs />
+            <AnalyticsKPIs workers={workers} approvedLeaves={approvedLeaves} />
             <AnalyticsCharts />
         </div>
     );

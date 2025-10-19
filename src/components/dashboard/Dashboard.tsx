@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import type { Worker, MonthlyData } from '@/types';
+import type { Worker, MonthlyData, LeaveRequest } from '@/types';
 import { processWorkerData } from '@/lib/utils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
@@ -14,6 +14,7 @@ import AdminDashboard from './AdminDashboard';
 export default function Dashboard() {
   const { user } = useAuth();
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState({
     year: new Date().getFullYear(),
@@ -38,14 +39,21 @@ export default function Dashboard() {
         }
       }
 
-      const attendanceSnapshot = await getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`));
+      // Fetch all necessary data in parallel
+      const [attendanceSnapshot, monthlyDocsSnap, approvedLeavesSnapshot] = await Promise.all([
+        getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`)),
+        getDocs(collection(db, `salaries_${date.year}_${date.month + 1}`)),
+        getDocs(query(collection(db, 'leaveRequests'), where('status', '==', 'approved')))
+      ]);
+      
+      const approvedLeavesData = approvedLeavesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as LeaveRequest);
+      setApprovedLeaves(approvedLeavesData);
+
       const attendanceData: { [key: string]: any } = {};
       attendanceSnapshot.forEach(doc => {
         attendanceData[doc.id] = doc.data().days;
       });
 
-      const salaryCollectionName = `salaries_${date.year}_${date.month + 1}`;
-      const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
       const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
       monthlyDocsSnap.forEach(doc => {
           monthlyDataMap[doc.id] = doc.data() as MonthlyData;
@@ -114,6 +122,7 @@ export default function Dashboard() {
             isAdmin={isAdmin}
             onDataUpdate={handleDataUpdate}
             activeView={activeView}
+            approvedLeaves={approvedLeaves}
           />
         ) : (
           <EmployeeDashboard 
