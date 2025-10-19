@@ -44,10 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  if (loading) {
-    return <LoadingSpinner fullScreen />;
-  }
-
   return (
     <AuthContext.Provider value={{ user, loading }}>
       {children}
