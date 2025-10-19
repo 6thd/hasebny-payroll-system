@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
+import { LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -18,7 +18,6 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +29,8 @@ export default function LoginForm() {
       router.push("/");
     } catch (err: any) {
       setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-      toast({
-        title: "خطأ في تسجيل الدخول",
+      toast.error("خطأ في تسجيل الدخول", {
         description: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
-        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -41,33 +38,32 @@ export default function LoginForm() {
   };
 
   return (
-    <div>
+    <div className="p-8 border rounded-xl shadow-sm bg-card text-card-foreground">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-white/20 rounded-full mx-auto flex items-center justify-center mb-4 border border-white/30">
-          <LockKeyhole className="w-8 h-8 text-white" />
-        </div>
         <h2 className="text-3xl font-bold">مرحباً بعودتك</h2>
-        <p className="text-white/70 mt-2">الرجاء إدخال بياناتك لتسجيل الدخول</p>
+        <p className="text-muted-foreground mt-2">الرجاء إدخال بياناتك لتسجيل الدخول</p>
       </div>
       <form onSubmit={handleLogin} className="space-y-6">
         <div>
-          <Label htmlFor="login-email" className="block mb-1 font-medium text-sm text-white/80">البريد الإلكتروني</Label>
+          <Label htmlFor="login-email" className="block mb-2 font-medium text-sm">البريد الإلكتروني</Label>
           <Input 
             type="email" 
             id="login-email" 
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-white placeholder:text-white/50" 
+            className="w-full p-3 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" 
             required 
+            placeholder="email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div>
-          <Label htmlFor="login-password" className="block mb-1 font-medium text-sm text-white/80">كلمة المرور</Label>
+          <Label htmlFor="login-password" className="block mb-2 font-medium text-sm">كلمة المرور</Label>
           <Input 
             type="password" 
             id="login-password" 
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-white" 
+            className="w-full p-3 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" 
             required
+            placeholder="********"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -77,7 +73,7 @@ export default function LoginForm() {
         </Button>
         {error && <p className="text-destructive text-sm text-center h-4">{error}</p>}
       </form>
-      <p className="text-center text-sm text-white/70 mt-6">
+      <p className="text-center text-sm text-muted-foreground mt-6">
         ليس لديك حساب؟ <Link href="/signup" className="font-bold text-primary hover:underline">سجل الآن</Link>
       </p>
     </div>

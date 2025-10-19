@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 
 export default function SignupForm() {
   const [name, setName] = useState("");
@@ -19,7 +19,6 @@ export default function SignupForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { toast } = useToast();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +46,7 @@ export default function SignupForm() {
         jobTitle: '',
         department: '',
         hireDate: new Date().toISOString().split('T')[0],
+        status: 'Active',
         basicSalary: 0, housing: 0, workNature: 0, transport: 0, phone: 0, food: 0, commission: 0, advances: 0, penalties: 0,
       };
 
@@ -54,15 +54,13 @@ export default function SignupForm() {
 
       router.push("/");
     } catch (err: any) {
+      let errorMessage = "حدث خطأ أثناء إنشاء الحساب.";
       if (err.code === 'auth/email-already-in-use') {
-        setError("هذا البريد الإلكتروني مسجل بالفعل.");
-      } else {
-        setError("حدث خطأ أثناء إنشاء الحساب.");
+        errorMessage = "هذا البريد الإلكتروني مسجل بالفعل.";
       }
-      toast({
-        title: "خطأ في إنشاء الحساب",
-        description: error,
-        variant: "destructive",
+      setError(errorMessage);
+      toast.error("خطأ في إنشاء الحساب", {
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -70,51 +68,54 @@ export default function SignupForm() {
   };
 
   return (
-    <div>
+    <div className="p-8 border rounded-xl shadow-sm bg-card text-card-foreground">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold">إنشاء حساب جديد</h2>
-        <p className="text-white/70 mt-2">أدخل بياناتك للانضمام إلينا</p>
+        <p className="text-muted-foreground mt-2">أدخل بياناتك للانضمام إلينا</p>
       </div>
       <form onSubmit={handleSignup} className="space-y-6">
         <div>
-          <Label htmlFor="signup-name" className="block mb-1 font-medium text-sm text-white/80">الاسم الكامل</Label>
+          <Label htmlFor="signup-name" className="block mb-2 font-medium text-sm">الاسم الكامل</Label>
           <Input 
             type="text" 
             id="signup-name" 
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-white" 
+            className="w-full p-3 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" 
             required
+            placeholder="مثال: خالد الأحمد"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div>
-          <Label htmlFor="signup-email" className="block mb-1 font-medium text-sm text-white/80">البريد الإلكتروني</Label>
+          <Label htmlFor="signup-email" className="block mb-2 font-medium text-sm">البريد الإلكتروني</Label>
           <Input 
             type="email" 
             id="signup-email" 
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-white" 
+            className="w-full p-3 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" 
             required 
+            placeholder="email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div>
-          <Label htmlFor="signup-password" className="block mb-1 font-medium text-sm text-white/80">كلمة المرور</Label>
+          <Label htmlFor="signup-password" className="block mb-2 font-medium text-sm">كلمة المرور</Label>
           <Input 
             type="password" 
             id="signup-password" 
-            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-white" 
+            className="w-full p-3 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none" 
             required
+            placeholder="********"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full bg-primary text-white p-3 rounded-lg font-bold hover:bg-primary/90 transition duration-300 shadow-lg" disabled={loading}>
+        <Button type="submit" className="w-full bg-primary text-primary-foreground p-3 rounded-lg font-bold hover:bg-primary/90 transition duration-300 shadow-lg" disabled={loading}>
           {loading ? "جارِ إنشاء الحساب..." : "إنشاء حساب"}
         </Button>
         {error && <p className="text-destructive text-sm text-center h-4">{error}</p>}
       </form>
-      <p className="text-center text-sm text-white/70 mt-6">
+      <p className="text-center text-sm text-muted-foreground mt-6">
         لديك حساب بالفعل؟ <Link href="/login" className="font-bold text-primary hover:underline">سجل الدخول</Link>
       </p>
     </div>
