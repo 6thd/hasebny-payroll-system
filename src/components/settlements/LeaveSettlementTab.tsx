@@ -10,15 +10,15 @@ import { Calculator } from 'lucide-react';
 import LeaveSettlementModal from './LeaveSettlementModal';
 
 interface LeaveSettlementTabProps {
-    workers: Worker[];
+    workers: (Worker & { lastApprovedLeaveDate?: string })[];
     onAction: () => void;
 }
 
 export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlementTabProps) {
-    const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
+    const [selectedWorker, setSelectedWorker] = useState<(Worker & { lastApprovedLeaveDate?: string }) | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const handleOpenModal = (worker: Worker) => {
+    const handleOpenModal = (worker: Worker & { lastApprovedLeaveDate?: string }) => {
         setSelectedWorker(worker);
         setIsModalOpen(true);
     };
@@ -81,6 +81,7 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
                 worker={selectedWorker}
+                onAction={onAction}
             />
         )}
         </>

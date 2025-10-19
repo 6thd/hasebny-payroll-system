@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { DialogDescription } from "../ui/dialog";
 
 const leaveRequestSchema = z.object({
   leaveType: z.string({
@@ -72,6 +73,9 @@ export default function LeaveRequestForm({ onSubmit, isSubmitting, currentBalanc
 
   return (
     <div className="space-y-4">
+        <DialogDescription>
+            اختر نوع الإجازة وتواريخها، ثم قم بإرسال الطلب للمراجعة.
+        </DialogDescription>
       {currentBalance !== null && (
           <Alert>
               <Info className="h-4 w-4" />
@@ -185,7 +189,7 @@ export default function LeaveRequestForm({ onSubmit, isSubmitting, currentBalanc
               )}
           />
 
-          <FormField
+          <FormField_
               control={form.control}
               name="notes"
               render={({ field }) => (

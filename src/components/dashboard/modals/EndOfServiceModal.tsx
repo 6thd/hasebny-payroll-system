@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { calculateEndOfService, finalizeTermination, EndOfServiceOutput } from '@/app/actions/eos';
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -139,6 +139,9 @@ export default function EndOfServiceModal({ isOpen, onClose, worker, onFinalized
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>حساب مستحقات نهاية الخدمة لـِ {worker.name}</DialogTitle>
+          <DialogDescription>
+            حدد سبب وتاريخ الإنهاء لحساب المستحقات النهائية للموظف.
+          </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>

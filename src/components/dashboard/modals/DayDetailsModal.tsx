@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -79,6 +79,9 @@ export default function DayDetailsModal({ isOpen, onClose, worker, day, year, mo
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>تفاصيل اليوم {day} - {worker.name}</DialogTitle>
+          <DialogDescription>
+            تعديل حالة الحضور ووقت الدخول والخروج للموظف في هذا اليوم.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

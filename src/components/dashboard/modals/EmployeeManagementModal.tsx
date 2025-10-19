@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -143,7 +143,12 @@ export default function EmployeeManagementModal({ isOpen, onClose, workers, onDa
     <>
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetFormAndClose() }}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-        <DialogHeader><DialogTitle>إدارة الموظفين</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>إدارة الموظفين</DialogTitle>
+          <DialogDescription>
+            إضافة، تعديل، أو حذف بيانات الموظفين وتفاصيلهم المالية.
+          </DialogDescription>
+        </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-grow overflow-hidden">
           <div className="md:col-span-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">

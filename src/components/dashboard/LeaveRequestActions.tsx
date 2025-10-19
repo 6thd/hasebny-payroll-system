@@ -6,7 +6,7 @@ import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import LoadingSpinner from '../LoadingSpinner';
 import { Check, X, Edit, ShieldAlert, Calendar as CalendarIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -102,6 +102,9 @@ export default function LeaveRequestActions({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>الموافقة على الإجازة مع تعديل</DialogTitle>
+                        <DialogDescription>
+                            يمكنك تعديل تواريخ البدء والانتهاء قبل الموافقة النهائية.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p>الموظف: <span className="font-semibold">{request.employeeName}</span></p>
