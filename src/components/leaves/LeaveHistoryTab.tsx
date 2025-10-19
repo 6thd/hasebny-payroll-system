@@ -29,7 +29,13 @@ interface LeaveHistoryTabProps {
 export default function LeaveHistoryTab({ requests, loading }: LeaveHistoryTabProps) {
     const formatDate = (timestamp: Timestamp) => {
         if (!timestamp) return 'N/A';
-        return format(timestamp.toDate(), 'P', { locale: arSA });
+        try {
+          const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp as any);
+          return format(date, 'P', { locale: arSA });
+        } catch (e) {
+            console.error("Invalid timestamp for date formatting:", timestamp);
+            return 'تاريخ غير صالح';
+        }
     };
 
     return (
