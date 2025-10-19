@@ -53,7 +53,7 @@ export default function LeaveManagementDashboard() {
             <TabsTrigger value="upcoming">
                 <CalendarClock className="ml-2 h-4 w-4" />
                 إجازات قادمة
-            </TabsTrigger>
+            </TabsRedirect>
             <TabsTrigger value="history">
                 <History className="ml-2 h-4 w-4" />
                 سجل الإجازات
