@@ -16,17 +16,16 @@ const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "seco
 };
 
 export default function UpcomingLeavesTab() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const { data: leaves, loading } = useFirestoreListener<LeaveRequest>({
         query: query(
             collection(db, 'leaveRequests'),
             where('status', '==', 'approved'),
+            where('startDate', '>=', Timestamp.fromDate(today)),
             orderBy('startDate', 'asc')
-        ),
-        onFetch: (allLeaves) => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return allLeaves.filter(leave => leave.startDate.toDate() >= today);
-        }
+        )
     });
 
     return (
