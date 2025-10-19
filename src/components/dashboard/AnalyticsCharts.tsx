@@ -131,7 +131,7 @@ export default function AnalyticsCharts() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg"><TrendingUp />تطور تكلفة الرواتب</CardTitle>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent className="h-[300px] flex items-center justify-center">
           {loading ? <LoadingSpinner /> : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
@@ -150,7 +150,7 @@ export default function AnalyticsCharts() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg"><PieIcon />توزيع الحضور (الشهر الحالي)</CardTitle>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent className="h-[300px] flex items-center justify-center">
           {loading ? <LoadingSpinner /> : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
