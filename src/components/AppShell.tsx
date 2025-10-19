@@ -12,7 +12,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Redirect to login only after loading is complete and if there's no user.
     if (!loading && !user) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [user, loading, router]);
 
@@ -27,7 +27,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
   
-  // While redirecting or if there's no user, show a loading screen or nothing.
-  // A loading spinner is appropriate here as the redirect is in progress.
-  return <LoadingSpinner fullScreen />;
+  // While redirecting or if there's no user, return null to avoid any flicker.
+  // The spinner is only shown during the initial auth check.
+  return null;
 }
