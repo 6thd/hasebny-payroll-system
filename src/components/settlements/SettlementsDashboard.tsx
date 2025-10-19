@@ -123,7 +123,7 @@ export default function SettlementsDashboard() {
 
   if (error) {
     return (
-      <div className="p-8 text-center">
+      <div className="flex items-center justify-center h-full p-8 text-center">
         <div className="max-w-md mx-auto p-6 bg-destructive/10 rounded-lg">
           <h3 className="text-lg font-semibold text-destructive mb-2">خطأ في تحميل البيانات</h3>
           <p className="text-muted-foreground mb-4">{error}</p>
