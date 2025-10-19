@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Briefcase, CalendarClock, History } from 'lucide-react';
+import { ArrowRight, Briefcase, CalendarClock, History, UserCheck } from 'lucide-react';
 import LeaveRequestsAdmin from '../dashboard/LeaveRequestsAdmin';
 import UpcomingLeavesTab from './UpcomingLeavesTab';
 import LeaveHistoryTab from './LeaveHistoryTab';
+import EmployeesOnLeave from '../dashboard/EmployeesOnLeave';
 
 export default function LeaveManagementDashboard() {
   const { user } = useAuth();
@@ -44,31 +45,48 @@ export default function LeaveManagementDashboard() {
           </CardHeader>
         </Card>
 
-        <Tabs defaultValue="history" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending">
-                <Briefcase className="ml-2 h-4 w-4" />
-                طلبات معلقة
-            </TabsTrigger>
-            <TabsTrigger value="upcoming">
-                <CalendarClock className="ml-2 h-4 w-4" />
-                إجازات قادمة
-            </TabsTrigger>
-            <TabsTrigger value="history">
-                <History className="ml-2 h-4 w-4" />
-                سجل الإجازات
-            </TabsTrigger>
-          </TabsList>
-           <TabsContent value="pending">
-                <LeaveRequestsAdmin onAction={handleAction} showAll={true} />
-          </TabsContent>
-          <TabsContent value="upcoming">
-            <UpcomingLeavesTab />
-          </TabsContent>
-          <TabsContent value="history">
-            <LeaveHistoryTab />
-          </TabsContent>
-        </Tabs>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+                <Tabs defaultValue="pending" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="pending">
+                            <Briefcase className="ml-2 h-4 w-4" />
+                            طلبات معلقة
+                        </TabsTrigger>
+                        <TabsTrigger value="upcoming">
+                            <CalendarClock className="ml-2 h-4 w-4" />
+                            إجازات قادمة
+                        </TabsTrigger>
+                        <TabsTrigger value="history">
+                            <History className="ml-2 h-4 w-4" />
+                            سجل الإجازات
+                        </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="pending">
+                        <LeaveRequestsAdmin onAction={handleAction} showAll={true} />
+                    </TabsContent>
+                    <TabsContent value="upcoming">
+                        <UpcomingLeavesTab />
+                    </TabsContent>
+                    <TabsContent value="history">
+                        <LeaveHistoryTab />
+                    </TabsContent>
+                </Tabs>
+            </div>
+             <div className="lg:col-span-1">
+                <Card className="h-full">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <UserCheck className="h-5 w-5" />
+                            الموظفون في إجازة
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <EmployeesOnLeave onAction={handleAction}/>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
       </div>
     </div>
   );

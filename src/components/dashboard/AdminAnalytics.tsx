@@ -1,8 +1,6 @@
 import { Worker } from '@/types';
 import AnalyticsCharts from "./AnalyticsCharts";
 import AnalyticsKPIs from "./AnalyticsKPIs";
-import EmployeesOnLeave from "./EmployeesOnLeave";
-import LeaveRequestsAdmin from "./LeaveRequestsAdmin";
 import AlertsManager from "./AlertsManager";
 
 interface AdminAnalyticsProps {
@@ -23,10 +21,6 @@ export default function AdminAnalytics({ workers = [], isAdmin = true }: AdminAn
             <AlertsManager workers={workers} isAdmin={isAdmin} />
             <AnalyticsKPIs />
             <AnalyticsCharts />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <LeaveRequestsAdmin onAction={handleAction} />
-                <EmployeesOnLeave onAction={handleAction}/>
-            </div>
         </div>
     );
 }
