@@ -81,19 +81,24 @@ export default function AnalyticsKPIs() {
                 
                 // --- 3. Fetch employees on leave today ---
                 const todayStart = new Date();
-                todayStart.setHours(0,0,0,0);
-                const todayEnd = new Date();
-                todayEnd.setHours(23,59,59,999);
+                todayStart.setHours(0, 0, 0, 0);
 
-                const onLeaveQuery = query(collection(db, 'leaveRequests'), 
-                    where('status', '==', 'approved'),
-                    where('startDate', '<=', Timestamp.fromDate(todayEnd)),
-                    where('endDate', '>=', Timestamp.fromDate(todayStart))
+                const onLeaveQuery = query(
+                  collection(db, 'leaveRequests'),
+                  where('status', '==', 'approved'),
+                  where('endDate', '>=', Timestamp.fromDate(todayStart))
                 );
-
+                
                 const onLeaveSnapshot = await getDocs(onLeaveQuery);
-                const onLeaveIds = new Set(onLeaveSnapshot.docs.map(doc => doc.data().employeeId));
 
+                const onLeaveIds = new Set<string>();
+                onLeaveSnapshot.docs.forEach(doc => {
+                    const leave = doc.data() as LeaveRequest;
+                    const startDate = leave.startDate.toDate();
+                    if(startDate <= today) {
+                        onLeaveIds.add(leave.employeeId);
+                    }
+                });
 
                 // --- 4. Fetch absent employees today ---
                 let absentToday = 0;
@@ -101,8 +106,7 @@ export default function AnalyticsKPIs() {
                     const attendedTodayIds = new Set<string>();
                     attendanceSnapshot.forEach(doc => {
                         const dayData = doc.data().days?.[dayOfMonth];
-                        // An employee is considered "attended" if they have ANY status for the day, even just 'present' without hours.
-                        if (dayData) {
+                        if (dayData && dayData.status !== 'absent') {
                            attendedTodayIds.add(doc.id);
                         }
                     });
