@@ -36,23 +36,28 @@ export default function SettlementsDashboard() {
     setError(null);
     
     try {
-      // --- Fetch for End of Service Tab ---
-      const eosSnapshot = await getDocs(query(collection(db, "employees"), where("status", "!=", "Terminated")));
-      const activeWorkersForEos = eosSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Worker));
+      // Run all Firestore queries in parallel for better performance
+      const [
+        allEmployeesSnapshot,
+        leaveRequestsSnapshot,
+        historySnapshot
+      ] = await Promise.all([
+        getDocs(collection(db, "employees")),
+        getDocs(query(
+          collection(db, "leaveRequests"),
+          where("status", "==", "approved"),
+          where("leaveType", "in", [...LEAVE_TYPES_FOR_SETTLEMENT])
+        )),
+        getDocs(query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc')))
+      ]);
+
+      const allWorkers: Worker[] = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+
+      // --- Process for End of Service Tab ---
+      const activeWorkersForEos = allWorkers.filter(w => w.status !== "Terminated");
       setEosWorkers(activeWorkersForEos);
 
-      // --- Fetch for Leave Settlement Tab ---
-      const allEmployeesSnapshot = await getDocs(collection(db, "employees"));
-      const allWorkers: Worker[] = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
-      
-      const leaveRequestsQuery = query(
-        collection(db, "leaveRequests"), 
-        where("status", "==", "approved"),
-        where("leaveType", "in", [...LEAVE_TYPES_FOR_SETTLEMENT])
-      );
-      
-      const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
-      
+      // --- Process for Leave Settlement Tab ---
       const approvedLeaveData: { [employeeId: string]: string } = {};
       leaveRequestsSnapshot.forEach(doc => {
           const req = doc.data();
@@ -77,33 +82,28 @@ export default function SettlementsDashboard() {
         setLeaveWorkers([]);
       }
       
-      // --- Fetch for History Tab ---
-        const historyQuery = query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc'));
-        const historySnapshot = await getDocs(historyQuery);
-        const employeeNames: { [id: string]: string } = {};
-        allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
+      // --- Process for History Tab ---
+      const employeeNames: { [id: string]: string } = {};
+      allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
 
-        const historyItems = historySnapshot.docs.map(doc => {
-            const data = doc.data();
-            const employeeId = doc.ref.parent.parent?.id || '';
-            return {
-                ...data,
-                id: doc.id,
-                employeeId: employeeId,
-                employeeName: employeeNames[employeeId] || 'موظف غير معروف',
-            } as ServiceHistoryItem;
-        });
+      const historyItems = historySnapshot.docs.map(doc => {
+          const data = doc.data();
+          const employeeId = doc.ref.parent.parent?.id || '';
+          return {
+              ...data,
+              id: doc.id,
+              employeeId: employeeId,
+              employeeName: employeeNames[employeeId] || 'موظف غير معروف',
+          } as ServiceHistoryItem;
+      });
       setHistory(historyItems);
 
-
     } catch (error: any) {
-      console.error("Error fetching workers: ", error);
+      console.error("Error fetching settlements data: ", error);
       let errorMessage = "An unknown error occurred while fetching data.";
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorMessage = "Failed to connect to the server. Please check your internet connection and try again.";
-      } else if (error.code === 'permission-denied') {
+      if (error.code === 'permission-denied') {
           errorMessage = "You do not have permission to access this data.";
-      } else {
+      } else if (error.message) {
           errorMessage = error.message;
       }
       setError(errorMessage);
