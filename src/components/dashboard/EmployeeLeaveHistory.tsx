@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase/client';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '../LoadingSpinner';
@@ -61,12 +61,13 @@ export default function EmployeeLeaveHistory({ employeeId }: EmployeeLeaveHistor
         return () => window.removeEventListener('data-updated', handleDataUpdate);
     }, [fetchRequests]);
 
-    const formatDate = (timestamp: Timestamp) => {
-        if (!timestamp) return 'N/A';
+    const formatDate = (date: Timestamp | Date) => {
+        if (!date) return 'N/A';
         try {
-          return format(timestamp.toDate(), 'P', { locale: arSA });
+          const jsDate = date instanceof Timestamp ? date.toDate() : date;
+          return format(jsDate, 'P', { locale: arSA });
         } catch (e) {
-            console.error("Invalid timestamp for date formatting:", timestamp);
+            console.error("Invalid date object for formatting:", date);
             return 'تاريخ غير صالح';
         }
     };

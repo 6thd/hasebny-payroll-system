@@ -1,171 +1,111 @@
-"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/hooks/use-auth';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '../ui/button';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, Briefcase, CalendarClock, History, UserCheck } from 'lucide-react';
-import LeaveRequestsAdmin from '../dashboard/LeaveRequestsAdmin';
-import UpcomingLeavesTab from './UpcomingLeavesTab';
-import LeaveHistoryTab from './LeaveHistoryTab';
-import EmployeesOnLeave from '../dashboard/EmployeesOnLeave';
-import { LeaveRequest } from '@/types';
+'use client';
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAllLeaveRequests, updateLeaveRequestStatus } from '@/app/actions/leave';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import type { LeaveRequest } from '@/types';
+import { format } from 'date-fns';
+
+const statusColors: { [key: string]: string } = {
+  pending: 'bg-yellow-500',
+  approved: 'bg-green-500',
+  rejected: 'bg-red-500',
+};
 
 export default function LeaveManagementDashboard() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
-  
-  const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
-  const [approvedRequests, setApprovedRequests] = useState<LeaveRequest[]>([]);
-  const [rejectedRequests, setRejectedRequests] = useState<LeaveRequest[]>([]);
-  const [activeLeaves, setActiveLeaves] = useState<LeaveRequest[]>([]);
-  const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveRequest[]>([]);
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState('pending');
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'leaveRequests'),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      const fetchedRequests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-      setAllRequests(fetchedRequests);
-
-      // Process and categorize requests
-      const pending: LeaveRequest[] = [];
-      const approved: LeaveRequest[] = [];
-      const rejected: LeaveRequest[] = [];
-      const active: LeaveRequest[] = [];
-      const upcoming: LeaveRequest[] = [];
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      fetchedRequests.forEach(req => {
-        if (req.status === 'pending') {
-          pending.push(req);
-        } else if (req.status === 'approved') {
-          approved.push(req);
-          const startDate = req.startDate.toDate();
-          const endDate = req.endDate.toDate();
-          endDate.setHours(23, 59, 59, 999);
-
-          if (endDate >= today) {
-            if (startDate <= today) {
-              active.push(req);
-            } else {
-              upcoming.push(req);
-            }
-          }
-        } else if (req.status === 'rejected') {
-          rejected.push(req);
+  const { data: leaveRequests = [], isLoading, error } = useQuery<LeaveRequest[]>({ // Corrected type annotation
+    queryKey: ['leaveRequests'],
+    queryFn: async () => {
+        const { requests, error } = await getAllLeaveRequests();
+        if (error) {
+            throw new Error(error);
         }
-      });
-      
-      setPendingRequests(pending);
-      setApprovedRequests(approved);
-      setRejectedRequests(rejected);
-      setActiveLeaves(active);
-      setUpcomingLeaves(upcoming);
+        return requests || [];
+    },
+  });
 
-    } catch (error) {
-      console.error("Error fetching leave data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const mutation = useMutation({
+    mutationFn: ({ leaveId, status }: { leaveId: string, status: 'approved' | 'rejected' }) => 
+      updateLeaveRequestStatus(leaveId, status),
+    onSuccess: (data) => {
+        if(data.success) {
+            toast.success(`Leave request ${data.leaveRequest?.status}`);
+            queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
+        } else {
+            toast.error(`Failed to update status: ${data.error}`);
+        }
+    },
+    onError: (error) => {
+        toast.error(`An error occurred: ${error.message}`);
+    },
+  });
 
-  useEffect(() => {
-    if (user && user.role === 'admin') {
-      fetchData();
-      window.addEventListener('data-updated', fetchData);
-    }
-    return () => {
-      window.removeEventListener('data-updated', fetchData);
-    };
-  }, [user, fetchData]);
-
-  if (!user || user.role !== 'admin') {
-    return <LoadingSpinner fullScreen />;
-  }
-
-  const handleAction = () => {
-    fetchData(); // Refetch all data after an action
+  const handleStatusUpdate = (leaveId: string, status: 'approved' | 'rejected') => {
+    mutation.mutate({ leaveId, status });
   };
 
-  const historyRequests = [...approvedRequests, ...rejectedRequests].sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime());
+  if (isLoading) return <p>Loading leave requests...</p>;
+  if (error) return <p className="text-red-500">Error fetching leave requests: {error.message}</p>;
+
+  const filteredRequests = leaveRequests.filter(req => filter === 'all' || req.status === filter);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-full mx-auto">
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-                <div>
-                    <CardTitle className="text-2xl">مركز إدارة الإجازات</CardTitle>
-                    <CardDescription>
-                    مراجعة واعتماد طلبات الإجازة، وعرض جدول الإجازات القادمة والسجل التاريخي.
-                    </CardDescription>
-                </div>
-                <Button onClick={() => router.push('/')}>
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                    العودة للوحة التحكم
-                </Button>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {loading ? <LoadingSpinner fullScreen /> : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <Tabs defaultValue="pending" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="pending">
-                                <Briefcase className="ml-2 h-4 w-4" />
-                                طلبات معلقة
-                            </TabsTrigger>
-                            <TabsTrigger value="upcoming">
-                                <CalendarClock className="ml-2 h-4 w-4" />
-                                إجازات قادمة
-                            </TabsTrigger>
-                            <TabsTrigger value="history">
-                                <History className="ml-2 h-4 w-4" />
-                                سجل الإجازات
-                            </TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="pending">
-                            <LeaveRequestsAdmin 
-                                requests={pendingRequests} 
-                                loading={loading} 
-                                onAction={handleAction} 
-                            />
-                        </TabsContent>
-                        <TabsContent value="upcoming">
-                            <UpcomingLeavesTab leaves={upcomingLeaves} loading={loading} />
-                        </TabsContent>
-                        <TabsContent value="history">
-                            <LeaveHistoryTab requests={historyRequests} loading={loading} />
-                        </TabsContent>
-                    </Tabs>
-                </div>
-                <div className="lg:col-span-1">
-                    <EmployeesOnLeave 
-                        activeLeaves={activeLeaves}
-                        upcomingLeaves={upcomingLeaves}
-                        loading={loading}
-                    />
-                </div>
-            </div>
-        )}
+    <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-md">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Leave Requests Management</h1>
+        <div className="flex items-center space-x-2">
+          <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
+          <Button variant={filter === 'pending' ? 'default' : 'outline'} onClick={() => setFilter('pending')}>Pending</Button>
+          <Button variant={filter === 'approved' ? 'default' : 'outline'} onClick={() => setFilter('approved')}>Approved</Button>
+          <Button variant={filter === 'rejected' ? 'default' : 'outline'} onClick={() => setFilter('rejected')}>Rejected</Button>
+        </div>
       </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Employee</TableHead>
+            <TableHead>Leave Type</TableHead>
+            <TableHead>Dates</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredRequests.map((request) => (
+            <TableRow key={request.id}>
+              <TableCell>{request.employeeName}</TableCell>
+              <TableCell>{request.leaveType}</TableCell>
+              <TableCell>
+                {format(new Date(request.startDate), 'PPP')} - {format(new Date(request.endDate), 'PPP')}
+              </TableCell>
+              <TableCell>
+                <Badge className={`${statusColors[request.status]} text-white`}>{request.status}</Badge>
+              </TableCell>
+              <TableCell>
+                {request.status === 'pending' && (
+                  <div className="flex space-x-2">
+                    <Button size="sm" variant="success" onClick={() => handleStatusUpdate(request.id, 'approved')} disabled={mutation.isPending}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate(request.id, 'rejected')} disabled={mutation.isPending}>
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

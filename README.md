@@ -340,7 +340,8 @@ This comprehensive enhancement strategy transforms Hasebny from a solid payroll 
 [23](https://www.youtube.com/watch?v=Mp6zBKUbot0)
 [24](https://www.reddit.com/r/nextjs/comments/umq42w/is_firebase_good_for_production_with_nextjs_to/)
 [25](https://www.youtube.com/watch?v=50fA5w0FHds)
-[26](https://www.youtube.com/watch?v=1LcsaD0pAS4)# نظام حساب الرواتب حاسبني (Hasebny Payroll System)
+[26](https://www.youtube.com/watch?v=1LcsaD0pAS4)
+# نظام حساب الرواتب حاسبني (Hasebny Payroll System)
 
 This is a comprehensive payroll management system built with Next.js and Firebase.
 
@@ -414,3 +415,222 @@ src/
 ## التوثيق
 
 للمزيد من المعلومات حول الميزات المحددة، راجع ملفات التوثيق في مجلدات المكونات.
+
+---
+
+## Optimistic UI Implementation Guide
+
+Here are practical and concise examples for IMPLEMENTING optimistic UI in Next.js 15 + TypeScript + Firebase (Firestore). Each example illustrates the pattern, what happens on failure, and how to avoid race conditions. You can copy/paste directly and adapt the paths (`@/lib/firebase`) to your project.
+
+### 1) Like button — optimistic increment + revert on failure
+```typescript
+"use client";
+import { useState } from "react";
+import { doc, updateDoc, increment } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type Props = {
+  postId: string;
+  initialLikes: number;
+  initiallyLiked?: boolean;
+};
+
+export default function LikeButton({ postId, initialLikes, initiallyLiked = false }: Props) {
+  const [likes, setLikes] = useState<number>(initialLikes);
+  const [liked, setLiked] = useState<boolean>(initiallyLiked);
+  const [saving, setSaving] = useState(false);
+
+  async function toggleLike() {
+    if (saving) return;
+    // optimistic update
+    const delta = liked ? -1 : 1;
+    setLikes((v) => v + delta);
+    setLiked((v) => !v);
+    setSaving(true);
+
+    try {
+      const ref = doc(db, "posts", postId);
+      await updateDoc(ref, { likes: increment(delta) }); // atomic on server
+    } catch (err) {
+      // revert on error
+      setLikes((v) => v - delta);
+      setLiked((v) => !v);
+      console.error("Failed to update like:", err);
+      // optionally show user feedback (toast)
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={toggleLike}
+      disabled={saving}
+      className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-60"
+    >
+      {liked ? "Liked" : "Like"} ({likes})
+    </button>
+  );
+}
+```
+
+**Why**: Use Firestore `increment()` so the server-side write is atomic. Optimistically update the UI immediately, then roll back if the update fails.
+
+### 2) Add comment — immediate UI insert (temp id) then reconcile with Firestore
+```typescript
+"use client";
+import { useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type Comment = {
+  id: string;
+  text: string;
+  authorId?: string;
+  createdAt?: any;
+  optimistic?: boolean;
+};
+
+export default function CommentForm({
+  postId,
+  comments,
+  setComments,
+  currentUserId,
+}: {
+  postId: string;
+  comments: Comment[];
+  setComments: (c: Comment[]) => void;
+  currentUserId?: string;
+}) {
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!text.trim()) return;
+    setSubmitting(true);
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const tempComment: Comment = {
+      id: tempId,
+      text,
+      authorId: currentUserId,
+      createdAt: new Date().toISOString(),
+      optimistic: true,
+    };
+
+    // optimistic UI insert at top
+    setComments([tempComment, ...comments]);
+    setText("");
+
+    try {
+      const docRef = await addDoc(collection(db, "posts", postId, "comments"), {
+        text: tempComment.text,
+        authorId: tempComment.authorId || null,
+        createdAt: serverTimestamp(),
+      });
+      // replace temp with real doc id and remove optimistic flag
+      setComments((prev) =>
+        prev.map((c) => (c.id === tempId ? { ...c, id: docRef.id, optimistic: false } : c))
+      );
+    } catch (err) {
+      // remove temp item if write failed
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      console.error("Failed to add comment:", err);
+      // show user feedback
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} />
+      <button onClick={submit} disabled={submitting || !text.trim()}>
+        Post
+      </button>
+    </div>
+  );
+}
+```
+
+**Why**: The UI is responsive immediately. If Firestore fails, we remove the optimistic entry. On success, we reconcile IDs and timestamps.
+
+### 3) React Query optimistic mutation (recommended when using cache)
+```typescript
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { doc, updateDoc, increment } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+export function useLikeMutation(postId: string) {
+  const qc = useQueryClient();
+
+  return useMutation(
+    async (delta: number) => {
+      const ref = doc(db, "posts", postId);
+      await updateDoc(ref, { likes: increment(delta) });
+    },
+    {
+      // optimistic update
+      onMutate: async (delta) => {
+        await qc.cancelQueries(["post", postId]);
+        const previous = qc.getQueryData<{ likes: number }>(["post", postId]);
+        qc.setQueryData(["post", postId], (old: any) => ({ ...(old || {}), likes: (old?.likes || 0) + delta }));
+        return { previous };
+      },
+      onError: (_err, _vars, context: any) => {
+        if (context?.previous) qc.setQueryData(["post", postId], context.previous);
+      },
+      onSettled: () => {
+        qc.invalidateQueries(["post", postId]);
+      },
+    }
+  );
+}
+```
+
+**Why**: React Query provides built-in rollback and cache invalidation, simplifying optimistic flows.
+
+### 4) Local write queue / batch flush for rapid user actions
+```typescript
+import { writeBatch, doc, getFirestore } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type Pending = { id: string; path: string[]; payload: any };
+let queue: Pending[] = [];
+let timer: ReturnType<typeof setTimeout> | null = null;
+const BATCH_WINDOW_MS = 500;
+
+export function enqueueWrite(p: Pending) {
+  queue.push(p);
+  if (timer) return;
+  timer = setTimeout(flushQueue, BATCH_WINDOW_MS);
+}
+
+async function flushQueue() {
+  if (!queue.length) return;
+  const items = queue.splice(0, queue.length);
+  timer = null;
+
+  const batch = writeBatch(db);
+  for (const it of items) {
+    // path example: ["posts", postId, "comments", commentId]
+    const ref = doc(db, ...it.path);
+    batch.set(ref, it.payload, { merge: true });
+  }
+  try {
+    await batch.commit();
+  } catch (err) {
+    console.error("Batch commit failed:", err);
+    // optionally retry or move failed items back into queue
+  }
+}
+```
+
+**Usage**: Push rapid updates to `enqueueWrite(...)` instead of writing immediately to reduce contention and RPC count.
+
+### Best practices checklist
+- Use optimistic UI for responsiveness; always implement rollback on failure.
+- Prefer Firestore primitives: `increment()` for counters, `runTransaction` for read-modify-write invariants.
+- Use a queue/batching for bursty UI actions.
+- Test concurrency with Firebase Emulator Suite.
+- For critical invariants, move logic to server (Cloud Functions / Server Actions) to avoid client-side race conditions.
+- If using caching libs (React Query / SWR) integrate optimistic patterns via their APIs.

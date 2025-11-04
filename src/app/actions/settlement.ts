@@ -1,68 +1,95 @@
 
-'use server';
+"use server";
 
-import { collection, collectionGroup, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { Worker, ServiceHistory } from '@/types';
+import { revalidatePath } from "next/cache";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { type ServiceHistoryItem } from "@/types";
+import { z } from "zod";
 
-/**
- * Fetches workers who are eligible for leave settlement.
- * This function now correctly preserves the Firestore document ID.
- */
-export async function getEligibleWorkersForLeaveSettlement(): Promise<(Worker & { lastApprovedLeaveDate?: string })[]> {
-    const workersCol = collection(db, 'employees');
-    const workersSnap = await getDocs(workersCol);
-    
-    // The key fix: We map over the documents, spread the data, and THEN explicitly set the 'id'
-    // to be the Firestore document's ID. This prevents any 'id' field within the document data
-    // (like an employee number) from overwriting the true database ID.
-    const workersData = workersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Worker);
+const settlementSchema = z.object({
+  workerId: z.string().min(1, { message: "Worker ID cannot be empty." }),
+  settlementType: z.enum(['EOS', 'LEAVE_SETTLEMENT']),
+  settlementData: z.any(),
+  companyId: z.string().min(1, { message: "Company ID cannot be empty." }),
+});
 
-    const eligibleWorkers = [];
+export async function finalizeSettlement(formData: FormData) {
+  const rawData = Object.fromEntries(formData.entries());
+  const validation = settlementSchema.safeParse(rawData);
 
-    for (const worker of workersData) {
-        const leaveHistoryQuery = query(
-            collection(db, 'employees', worker.id, 'leaveHistory'),
-            orderBy('endDate', 'desc')
-        );
-        const leaveHistorySnap = await getDocs(leaveHistoryQuery);
+  if (!validation.success) {
+    // Extract and format errors from Zod
+    const errorMessages = validation.error.errors.map(e => `${e.path.join('.')} - ${e.message}`).join(", ");
+    return { success: false, error: `Invalid data provided: ${errorMessages}` };
+  }
 
-        if (!leaveHistorySnap.empty) {
-            const lastLeave = leaveHistorySnap.docs[0].data();
-            eligibleWorkers.push({
-                ...worker, // The worker object now has the correct Firestore ID
-                lastApprovedLeaveDate: lastLeave.endDate,
-            });
-        }
+  const { workerId, settlementType, settlementData, companyId } = validation.data;
+
+  try {
+    const parsedSettlementData = JSON.parse(settlementData);
+
+    const batch = db.batch();
+
+    const workerRef = db.collection("employees").doc(workerId);
+
+    // 1. Update worker status
+    if (settlementType === 'EOS') {
+      batch.update(workerRef, { 
+        status: 'Terminated', 
+        terminationDate: parsedSettlementData.endDate 
+      });
+    } else if (settlementType === 'LEAVE_SETTLEMENT') {
+      batch.update(workerRef, { 
+        'leaveBalance.lastSettlementDate': parsedSettlementData.calculationDate 
+      });
     }
 
-    return eligibleWorkers;
-}
-
-/**
- * Fetches the finalized settlement history from all workers.
- */
-export async function getSettlementHistory(): Promise<ServiceHistory[]> {
-    const historyQuery = query(
-        collectionGroup(db, 'serviceHistory'),
-        orderBy('finalizedAt', 'desc')
-    );
+    // 2. Add to service history
+    const serviceHistoryRef = workerRef.collection('serviceHistory').doc();
     
-    const historySnap = await getDocs(historyQuery);
+    let historyItem: Omit<ServiceHistoryItem, 'id'>;
 
-    const historyData = historySnap.docs.map(doc => {
-        const data = doc.data();
-        // The same fix is applied here to ensure data integrity.
-        return {
-            ...data,
-            id: doc.id, // Preserve the Firestore document ID
-            finalizedAt: data.finalizedAt.toDate().toISOString(),
-            details: {
-                ...data.details,
-                calculationDate: data.details.calculationDate.toDate ? data.details.calculationDate.toDate().toISOString() : data.details.calculationDate,
-            }
-        } as ServiceHistory;
-    });
+    if (settlementType === 'EOS') {
+        historyItem = {
+            type: "EndOfService",
+            startDate: parsedSettlementData.startDate,
+            endDate: parsedSettlementData.endDate,
+            jobTitle: parsedSettlementData.jobTitle, // Assuming these are part of the settlementData
+            salary: parsedSettlementData.finalSalary, // Assuming final salary is passed
+            details: JSON.stringify(parsedSettlementData.breakdown),
+            finalizedAt: parsedSettlementData.endDate, // Or calculation date
+            totalAmount: parsedSettlementData.totalCompensation,
+        };
+    } else { // LEAVE_SETTLEMENT
+        historyItem = {
+            type: "LeaveSettlement",
+            startDate: parsedSettlementData.calculationBasis.periodStartDate,
+            endDate: parsedSettlementData.calculationBasis.periodEndDate,
+            jobTitle: parsedSettlementData.worker?.jobTitle || 'N/A',
+            salary: parsedSettlementData.worker?.salary || 0,
+            details: JSON.stringify(parsedSettlementData.calculationBasis),
+            finalizedAt: parsedSettlementData.calculationDate,
+            totalAmount: parsedSettlementData.monetaryValue,
+            monetaryValue: parsedSettlementData.monetaryValue,
+        };
+    }
 
-    return historyData;
+    const serviceHistoryItem: ServiceHistoryItem = {
+        id: serviceHistoryRef.id,
+        ...historyItem,
+    };
+
+    batch.set(serviceHistoryRef, serviceHistoryItem);
+
+    await batch.commit();
+
+    revalidatePath('/');
+    revalidatePath('/settlements');
+
+    return { success: true, message: "Settlement finalized successfully." };
+
+  } catch (error) {
+    console.error("Error finalizing settlement:", error);
+    return { success: false, error: "Failed to finalize settlement." };
+  }
 }

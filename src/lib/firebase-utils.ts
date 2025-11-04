@@ -1,6 +1,6 @@
 
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firebase/client'; // Corrected import path
 
 /**
  * Checks for basic network connectivity.

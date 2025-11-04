@@ -1,8 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
-// import { getPayrollHistory } from './firestoreUtils';
 
-// NOTE: getPayrollHistory is not defined yet. 
-// This is a placeholder until we have a way to fetch payroll history.
 async function getPayrollHistory(employeeId: string): Promise<{salary: number}[]> {
     console.log(`Fetching payroll history for ${employeeId}...`);
     // This is mock data. In a real application, you would fetch this from Firestore.
@@ -12,22 +9,44 @@ async function getPayrollHistory(employeeId: string): Promise<{salary: number}[]
     ];
 }
 
-
-export async function predictSalaryTrend(employeeId: string) {
+export async function predictSalaryTrend(employeeId: string): Promise<number> {
   const history = await getPayrollHistory(employeeId);
-  if (history.length < 6) throw Error('يلزم 6 أشهر من البيانات على الأقل');
+  if (history.length < 6) throw new Error('A minimum of 6 months of data is required.');
 
-  // تحويل البيانات إلى تسلسل زمني مناسب للنموذج
   const salaries = history.map(h => h.salary);
+
+  // Prepare the data for the model
   const xs = tf.tensor2d(salaries.slice(0, -1), [salaries.length - 1, 1]);
   const ys = tf.tensor2d(salaries.slice(1), [salaries.length - 1, 1]);
 
+  // Define and compile the model
   const model = tf.sequential();
   model.add(tf.layers.dense({units: 8, inputShape: [1], activation: 'relu'}));
   model.add(tf.layers.dense({units: 1}));
   model.compile({loss: 'meanSquaredError', optimizer: 'adam'});
 
-  await model.fit(xs, ys, {epochs: 180});
-  const nextSalary = model.predict(tf.tensor2d([salaries[salaries.length-1]], [1,1])).dataSync()[0];
+  // Train the model
+  await model.fit(xs, ys, {epochs: 180, verbose: 0});
+
+  // Use tf.tidy for prediction and automatic memory cleanup
+  const nextSalary = tf.tidy(() => {
+    const input = tf.tensor2d([salaries[salaries.length - 1]], [1, 1]);
+    const prediction = model.predict(input);
+
+    // Use `instanceof` and `Array.isArray` as robust type guards
+    if (prediction instanceof tf.Tensor) {
+        return prediction.dataSync()[0];
+    } else if (Array.isArray(prediction)) {
+        return prediction[0].dataSync()[0];
+    } else {
+        throw new Error("Unexpected output format from model.predict");
+    }
+  });
+
+  // Manually dispose of the tensors used for training
+  xs.dispose();
+  ys.dispose();
+  model.dispose();
+
   return nextSalary;
 }

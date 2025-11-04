@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, query, where, collectionGroup, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/use-auth';
-import type { Worker, ServiceHistoryItem } from '@/types';
+import type { Worker, ServiceHistoryItem, LeaveRequest } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,7 +37,6 @@ export default function SettlementsDashboard() {
     setError(null);
     
     try {
-      // Run all Firestore queries in parallel for better performance
       const [
         allEmployeesSnapshot,
         leaveRequestsSnapshot,
@@ -51,16 +51,27 @@ export default function SettlementsDashboard() {
         getDocs(query(collectionGroup(db, 'serviceHistory'), orderBy('finalizedAt', 'desc')))
       ]);
 
-      const allWorkers: Worker[] = allEmployeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      // Safely construct Worker objects
+      const allWorkers: Worker[] = allEmployeesSnapshot.docs.map((doc):
+Worker => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || 'N/A',
+          jobTitle: data.jobTitle || 'N/A',
+          joiningDate: data.joiningDate,
+          salary: data.salary || 0,
+          contractType: data.contractType || 'unlimited',
+          ...data, // Spread the rest of the data
+        };
+      });
 
-      // --- Process for End of Service Tab ---
       const activeWorkersForEos = allWorkers.filter(w => w.status !== "Terminated");
       setEosWorkers(activeWorkersForEos);
 
-      // --- Process for Leave Settlement Tab ---
       const approvedLeaveData: { [employeeId: string]: string } = {};
       leaveRequestsSnapshot.forEach(doc => {
-          const req = doc.data();
+          const req = doc.data() as LeaveRequest;
           const existingDate = approvedLeaveData[req.employeeId];
           const currentStartDate = req.startDate.toDate().toISOString().split('T')[0];
           if (!existingDate || new Date(currentStartDate) > new Date(existingDate)) {
@@ -72,29 +83,37 @@ export default function SettlementsDashboard() {
 
       if (approvedEmployeeIds.length > 0) {
         const leaveWorkersToLoad = allWorkers
-            .filter(worker => approvedEmployeeIds.includes(worker.id) && worker.status !== 'Terminated')
+            .filter(worker => worker.id && approvedEmployeeIds.includes(worker.id) && worker.status !== 'Terminated')
             .map(worker => ({
                 ...worker,
-                lastApprovedLeaveDate: approvedLeaveData[worker.id]
+                lastApprovedLeaveDate: approvedLeaveData[worker.id!]
             }));
         setLeaveWorkers(leaveWorkersToLoad);
       } else {
         setLeaveWorkers([]);
       }
       
-      // --- Process for History Tab ---
       const employeeNames: { [id: string]: string } = {};
       allWorkers.forEach(w => { employeeNames[w.id] = w.name; });
 
-      const historyItems = historySnapshot.docs.map(doc => {
+      // Safely construct ServiceHistoryItem objects
+      const historyItems: ServiceHistoryItem[] = historySnapshot.docs.map((doc): ServiceHistoryItem => {
           const data = doc.data();
           const employeeId = doc.ref.parent.parent?.id || '';
           return {
-              ...data,
-              id: doc.id,
-              employeeId: employeeId,
-              employeeName: employeeNames[employeeId] || 'موظف غير معروف',
-          } as ServiceHistoryItem;
+            id: doc.id,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            jobTitle: data.jobTitle,
+            salary: data.salary,
+            details: data.details,
+            employeeName: employeeNames[employeeId] || 'Unknown Employee',
+            type: data.type || 'N/A',
+            finalizedAt: data.finalizedAt,
+            totalAmount: data.totalAmount,
+            monetaryValue: data.monetaryValue,
+            ...data, // spread the rest
+          };
       });
       setHistory(historyItems);
 

@@ -1,5 +1,5 @@
-import AppShell from "@/components/AppShell";
-import ProfilePage from "@/components/profile/ProfilePage";
+import AppShell from "../../components/AppShell";
+import { ProfilePage } from "../../components/profile/ProfilePage";
 
 export default function Profile() {
   return (

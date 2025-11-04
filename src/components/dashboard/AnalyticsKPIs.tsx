@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Wallet, UserX, UserCheck } from 'lucide-react';
 import { Worker, MonthlyData, LeaveRequest } from '@/types';
@@ -36,6 +36,13 @@ export default function AnalyticsKPIs({ workers, approvedLeaves }: { workers: Wo
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const getJsDate = (date: Date | Timestamp): Date => {
+            if (date instanceof Timestamp) {
+                return date.toDate();
+            }
+            return date;
+        };
+
         const calculateKpis = async () => {
             setLoading(true);
             try {
@@ -67,8 +74,8 @@ export default function AnalyticsKPIs({ workers, approvedLeaves }: { workers: Wo
 
                 const onLeaveIds = new Set<string>();
                 approvedLeaves.forEach(leave => {
-                    const startDate = leave.startDate.toDate();
-                    const endDate = leave.endDate.toDate();
+                    const startDate = getJsDate(leave.startDate);
+                    const endDate = getJsDate(leave.endDate);
                     if(startDate <= today && endDate >= todayStart) {
                         onLeaveIds.add(leave.employeeId);
                     }

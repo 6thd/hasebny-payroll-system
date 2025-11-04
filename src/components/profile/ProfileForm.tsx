@@ -1,147 +1,94 @@
+
 "use client";
 
+import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { useToast } from "@/hooks/use-toast";
-import { AppUser } from "@/types";
-
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
-import { updateUserProfile } from "@/app/actions/profile";
+import { Label } from "@/components/ui/label";
+import { AppUser } from "@/types";
+import { useTransition } from "react";
+import { toast } from "sonner";
+import { updateUserProfile } from "@/app/actions/user-actions";
 
-const profileFormSchema = z.object({
-  name: z.string().min(3, { message: "الاسم يجب أن يحتوي على 3 أحرف على الأقل." }),
+const profileSchema = z.object({
+  name: z.string().min(3, "يجب أن يكون الاسم 3 أحرف على الأقل"),
+  email: z.string().email("بريد إلكتروني غير صالح"),
   jobTitle: z.string().optional(),
   department: z.string().optional(),
-  email: z.string().email({ message: "البريد الإلكتروني غير صالح." }),
 });
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 interface ProfileFormProps {
-  user: AppUser;
+  user: AppUser | null;
 }
 
-export default function ProfileForm({ user }: ProfileFormProps) {
-  const { toast } = useToast();
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
+export function ProfileForm({ user }: ProfileFormProps) {
+  const [isPending, startTransition] = useTransition();
+
+  const { register, handleSubmit, formState: { errors } } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: user.name || "",
-      jobTitle: user.jobTitle || "",
-      department: user.department || "",
-      email: user.email || "",
+      name: user?.name || "",
+      email: user?.email || "",
+      jobTitle: user?.jobTitle || "",
+      department: user?.department || "",
     },
-    mode: "onChange",
   });
 
-  const { isSubmitting } = form.formState;
-
-  async function onSubmit(data: ProfileFormValues) {
-    const result = await updateUserProfile({
-        employeeId: user.id,
-        ...data
-    });
-
-    if (result.success) {
-        toast({
-            title: "تم بنجاح",
-            description: "تم تحديث بيانات ملفك الشخصي بنجاح.",
-        });
-    } else {
-        const errorMessage = typeof result.error === 'string' 
-            ? result.error
-            : "حدث خطأ غير متوقع.";
-        toast({
-            title: "خطأ في التحديث",
-            description: errorMessage,
-            variant: "destructive",
-        });
+  const onSubmit: SubmitHandler<ProfileFormValues> = (data) => {
+    if (!user?.id) {
+        toast.error("معرف المستخدم غير موجود.");
+        return;
     }
-  }
+    
+    // By this point, user.id is guaranteed to be a string.
+    // We assign it to a const to help TypeScript's control flow analysis within the closure.
+    const userId = user.id;
+
+    startTransition(async () => {
+      try {
+        const result = await updateUserProfile(userId, data);
+        if (result.success) {
+          toast.success("تم تحديث الملف الشخصي بنجاح!");
+        } else {
+          toast.error(result.error || "حدث خطأ غير معروف.");
+        }
+      } catch (error) {
+        toast.error("فشل في تحديث الملف الشخصي.");
+      }
+    });
+  };
 
   return (
-    <Card>
-        <CardHeader>
-            <CardTitle>ملفي الشخصي</CardTitle>
-            <CardDescription>
-                يمكنك تحديث بياناتك الشخصية من هنا.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>الاسم الكامل</FormLabel>
-                        <FormControl>
-                        <Input placeholder="اسمك الكامل" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>البريد الإلكتروني</FormLabel>
-                        <FormControl>
-                        <Input placeholder="email@example.com" {...field} disabled />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="jobTitle"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>المسمى الوظيفي</FormLabel>
-                        <FormControl>
-                        <Input placeholder="مثال: محاسب" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="department"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>القسم</FormLabel>
-                        <FormControl>
-                        <Input placeholder="مثال: المالية" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                
-                <Button type="submit" disabled={isSubmitting} className="w-full">
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    حفظ التغييرات
-                </Button>
-                </form>
-            </Form>
-        </CardContent>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="name">الاسم</Label>
+        <Input id="name" {...register("name")} defaultValue={user?.name || ''} />
+        {errors.name && <p className="text-red-500 text-sm">{errors.name.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">البريد الإلكتروني</Label>
+        <Input id="email" type="email" {...register("email")} defaultValue={user?.email || ''} readOnly disabled />
+        {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="jobTitle">المسمى الوظيفي</Label>
+        <Input id="jobTitle" {...register("jobTitle")} defaultValue={user?.jobTitle || ''} />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="department">القسم</Label>
+        <Input id="department" {...register("department")} defaultValue={user?.department || ''} />
+      </div>
+
+      <Button type="submit" disabled={isPending}>
+        {isPending ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+      </Button>
+    </form>
   );
 }

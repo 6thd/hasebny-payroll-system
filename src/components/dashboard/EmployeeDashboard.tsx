@@ -1,193 +1,121 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { getEmployeeData } from '@/app/actions/employee-actions';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { AttendanceCalendar } from './AttendanceCalendar';
+import { PayrollHistory } from './PayrollHistory';
+import Charts from './Charts';
+import DayDetailsModal from './modals/DayDetailsModal';
+import { type DayData, type PayrollData } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MONTHS, calculatePayroll } from '@/lib/utils';
-import type { Worker } from '@/types';
-import AttendanceTable from './AttendanceTable';
-import LeaveRequestForm, { type LeaveRequestFormValues } from './LeaveRequestForm';
-import { FilePlus2, Loader2 } from 'lucide-react';
-import EmployeeLeaveHistory from './EmployeeLeaveHistory';
-import { calculateLeaveBalance } from '@/app/actions/leave-balance';
-import { submitLeaveRequest } from '@/app/actions/leave';
-import { toast } from 'sonner';
-import { useAuth } from '@/hooks/use-auth';
+import { calculateLeaveBalance, type LeaveBalanceOutput } from '@/app/actions/leave-balance';
+import { toast } from "sonner";
+import { LeaveBalanceResultCard } from './LeaveBalanceResultCard';
+import { Timestamp } from 'firebase/firestore';
 
 interface EmployeeDashboardProps {
-  employee: Worker;
-  year: number;
-  month: number;
-  onDateChange: (newDate: { year: number; month: number }) => void;
-  onDataUpdate: () => void;
+  employeeId: string;
+  currentMonth: number;
+  currentYear: number;
 }
 
-const StatCard = ({ title, value }: { title: string; value: string | number }) => (
-  <Card>
-    <CardHeader className="pb-2">
-      <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold text-primary">{value}</div>
-    </CardContent>
-  </Card>
-);
+const getJsDate = (date: string | Date | Timestamp): Date => {
+    if (typeof date === 'string') {
+        return new Date(date);
+    }
+    if (date instanceof Timestamp) {
+        return date.toDate();
+    }
+    return date;
+};
 
-interface LeaveModalState {
-    isOpen: boolean;
-    isLoading: boolean;
-    balance: number | null;
-}
+export default function EmployeeDashboard({ employeeId, currentMonth, currentYear }: EmployeeDashboardProps) {
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
+  const [leaveBalanceResult, setLeaveBalanceResult] = useState<LeaveBalanceOutput | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['employeeData', employeeId, currentYear, currentMonth],
+    queryFn: () => getEmployeeData({ employeeId, year: currentYear, month: currentMonth }),
+  });
 
-export default function EmployeeDashboard({ employee, year, month, onDateChange, onDataUpdate }: EmployeeDashboardProps) {
-  const [leaveModalState, setLeaveModalState] = useState<LeaveModalState>({ isOpen: false, isLoading: false, balance: null });
-  const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
-  const { user } = useAuth();
-  
-  if (!employee) {
-    return <div className="text-center text-red-500">لا يمكن تحميل بيانات الموظف.</div>;
-  }
-  
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
-  const { netSalary } = calculatePayroll(employee, year, month);
-  const CURRENCY = 'ريال';
-  
-  const handleOpenLeaveModal = async () => {
-      setLeaveModalState({ isOpen: true, isLoading: true, balance: null });
+  const handleDayClick = (dayData: DayData) => {
+    setSelectedDay(dayData);
+    setModalOpen(true);
+  };
+
+  const handleCalculateLeave = async () => {
+      setIsCalculating(true);
+      setLeaveBalanceResult(null);
       try {
-          const result = await calculateLeaveBalance({ employeeId: employee.id });
-          if (result.success) {
-              setLeaveModalState(prevState => ({ ...prevState, isLoading: false, balance: result.data.accruedDays }));
-          } else {
-              toast.error("خطأ", { description: result.error });
-              setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
+          if (!data?.worker) {
+            toast.error("بيانات الموظف غير متاحة.");
+            return;
           }
-      } catch (error) {
-          toast.error("خطأ", { description: "لم نتمكن من جلب رصيد الإجازات." });
-          setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
+          const result = await calculateLeaveBalance({
+            worker: data.worker,
+            settlementDate: new Date().toISOString(),
+          });
+          if (result.success && result.data) {
+              setLeaveBalanceResult(result.data);
+              toast.success("تم حساب رصيد الإجازات بنجاح!");
+          } else if (!result.success) {
+              toast.error(`خطأ في الحساب: ${result.error}`);
+          }
+      } catch (e: any) {
+          toast.error(`فشل في حساب الرصيد: ${e.message}`);
+      } finally {
+          setIsCalculating(false);
       }
-  };
+  }
 
-  const handleCloseLeaveModal = () => {
-    setLeaveModalState({ isOpen: false, isLoading: false, balance: null });
-  };
+  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (error) return <p className="text-center text-red-500">Error: {error.message}</p>;
+  if (!data) return <p className="text-center">No data available.</p>;
 
-  const handleLeaveSubmit = async (data: LeaveRequestFormValues) => {
-    if (!user) {
-      toast.error("خطأ", { description: "يجب أن تكون مسجلاً لتقديم طلب." });
-      return;
-    }
-
-    setIsSubmittingLeave(true);
-    const result = await submitLeaveRequest({
-      ...data,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      employeeId: user.id,
-      employeeName: user.name || user.email || 'غير معروف',
-      leaveType: data.leaveType,
-    });
-    setIsSubmittingLeave(false);
-
-    if (result.success) {
-      toast.success("تم إرسال الطلب", {
-        description: "تم إرسال طلب الإجازة بنجاح للمراجعة.",
-      });
-      handleCloseLeaveModal();
-      onDataUpdate();
-    } else {
-      console.error("Error submitting leave request: ", result.error);
-      const errorMessage = typeof result.error === 'string' 
-        ? result.error
-        : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.";
-      
-      toast.error("خطأ", {
-        description: errorMessage,
-      });
-    }
-  };
-
+  const { worker, payrollHistory } = data;
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>نظرة عامة على راتب شهر {MONTHS[month]} {year}</CardTitle>
-            <div className="flex items-center gap-2 justify-center sm:justify-start">
-              <Select
-                value={String(month)}
-                onValueChange={(value) => onDateChange({ year, month: Number(value) })}
-              >
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="الشهر" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={String(year)}
-                onValueChange={(value) => onDateChange({ month, year: Number(value) })}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="السنة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map(y => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard title="صافي الراتب" value={`${netSalary.toFixed(2)} ${CURRENCY}`} />
-          <StatCard title="أيام الغياب" value={employee.absentDays || 0} />
-          <StatCard title="ساعات العمل الإضافي" value={(employee.totalOvertime || 0).toFixed(1)} />
-           <Button className="h-full text-lg" onClick={handleOpenLeaveModal} disabled={leaveModalState.isLoading}>
-                {leaveModalState.isLoading ? (
-                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                ) : (
-                    <FilePlus2 className="mr-2 h-6 w-6" />
-                )}
-                {leaveModalState.isLoading ? 'جارٍ التحميل...' : 'تقديم طلب إجازة'}
-            </Button>
-        </CardContent>
-      </Card>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold">مرحباً, {worker?.name || 'موظف'}</h1>
+          <p className="text-muted-foreground">
+            هذه لوحة التحكم الخاصة بك. يمكنك عرض الحضور والرواتب والمزيد.
+          </p>
+        </div>
+         <Button onClick={handleCalculateLeave} disabled={isCalculating}>
+            {isCalculating ? 'جارٍ الحساب...' : 'حساب رصيد الإجازات المستحقة'}
+        </Button>
+      </div>
       
-      <Dialog open={leaveModalState.isOpen} onOpenChange={handleCloseLeaveModal}>
-        <DialogContent>
-            <DialogHeader>
-            <DialogTitle>تقديم طلب إجازة</DialogTitle>
-            </DialogHeader>
-            <LeaveRequestForm 
-              onSubmit={handleLeaveSubmit}
-              isSubmitting={isSubmittingLeave} 
-              currentBalance={leaveModalState.balance} 
-            />
-        </DialogContent>
-      </Dialog>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>جدول الحضور لشهر {MONTHS[month]} {year}</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <AttendanceTable
-            workers={[employee]}
-            year={year}
-            month={month}
-            isAdmin={false}
-            onDataUpdate={onDataUpdate}
-          />
-        </CardContent>
-      </Card>
+      {leaveBalanceResult && <LeaveBalanceResultCard leaveBalance={leaveBalanceResult} />}
 
-      <EmployeeLeaveHistory employeeId={employee.id} />
+      <AttendanceCalendar 
+        days={worker?.days || {}} 
+        year={currentYear} 
+        month={currentMonth} 
+        onDayClick={handleDayClick} 
+      />
+      
+      <PayrollHistory payrollHistory={payrollHistory as PayrollData[]} />
+      
+      <Charts payrollHistory={payrollHistory as PayrollData[]} />
+
+      {isModalOpen && selectedDay && worker && (
+        <DayDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => setModalOpen(false)}
+          worker={worker}
+          day={getJsDate(selectedDay.date).getDate()}
+          year={currentYear}
+          month={currentMonth}
+          onDataUpdate={() => refetch()} 
+        />
+      )}
     </div>
   );
 }

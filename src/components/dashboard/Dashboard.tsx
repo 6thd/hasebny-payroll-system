@@ -1,19 +1,20 @@
-"use client";
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/hooks/use-auth';
-import type { Worker, MonthlyData, LeaveRequest } from '@/types';
-import { processWorkerData } from '@/lib/utils';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { db } from '../../lib/firebase/client';
+import { useAuth } from '../../hooks/use-auth';
+import type { Worker, MonthlyData, LeaveRequest } from '../../types';
+import { processWorkerData } from '../../lib/utils';
+import LoadingSpinner from '../LoadingSpinner';
 import DashboardHeader from './DashboardHeader';
 import EmployeeDashboard from './EmployeeDashboard';
 import AdminDashboard from './AdminDashboard';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]); // Processed workers for display
+  const [rawWorkers, setRawWorkers] = useState<Worker[]>([]); // Raw, clean workers for modals
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState({
@@ -39,6 +40,9 @@ export default function Dashboard() {
         }
       }
 
+      // Store a clean, raw version of the workers for modals.
+      setRawWorkers(workersToLoad);
+
       // Fetch all necessary data in parallel
       const [attendanceSnapshot, monthlyDocsSnap, approvedLeavesSnapshot] = await Promise.all([
         getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`)),
@@ -59,6 +63,7 @@ export default function Dashboard() {
           monthlyDataMap[doc.id] = doc.data() as MonthlyData;
       });
       
+      // Process the workers list for display purposes. The ID is now correctly preserved.
       const processedWorkers = workersToLoad.map(w => {
         const workerWithFullData = { 
           ...w, 
@@ -91,7 +96,6 @@ export default function Dashboard() {
 
   const handleDataUpdate = useCallback(() => {
     fetchData();
-    // This custom event helps other components (like charts) know when to refetch data
     window.dispatchEvent(new CustomEvent('data-updated'));
   }, [fetchData]);
 
@@ -109,7 +113,8 @@ export default function Dashboard() {
           date={date}
           onDateChange={handleDateChange}
           isAdmin={isAdmin}
-          workers={workers}
+          // Pass the clean, raw workers list to the header and its modals.
+          workers={rawWorkers}
           onDataUpdate={handleDataUpdate}
           activeView={activeView}
           setActiveView={setActiveView}
@@ -117,6 +122,7 @@ export default function Dashboard() {
 
         {isAdmin ? (
           <AdminDashboard
+            // Pass the processed workers for display in the dashboard views.
             workers={workers}
             date={date}
             isAdmin={isAdmin}
@@ -125,13 +131,13 @@ export default function Dashboard() {
             approvedLeaves={approvedLeaves}
           />
         ) : (
-          <EmployeeDashboard 
-            employee={workers[0]}
-            year={date.year}
-            month={date.month}
-            onDateChange={handleDateChange}
-            onDataUpdate={handleDataUpdate}
-          />
+          workers[0] && (
+            <EmployeeDashboard 
+              employeeId={workers[0].id}
+              currentYear={date.year}
+              currentMonth={date.month}
+            />
+          )
         )}
       </div>
     </div>

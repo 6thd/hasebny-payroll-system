@@ -1,8 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { adminDb as db } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
 
 const ProfileUpdateSchema = z.object({
@@ -26,20 +25,31 @@ export async function updateUserProfile(data: ProfileUpdateInput) {
 
   const { employeeId, ...updateData } = validation.data;
 
-  try {
-    const employeeRef = doc(db, 'employees', employeeId);
-    await updateDoc(employeeRef, updateData);
-    
-    // Revalidate the profile page and the main dashboard to reflect changes
-    revalidatePath('/profile');
-    revalidatePath('/');
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const employeeRef = db.collection('employees').doc(employeeId);
+      await employeeRef.update(updateData);
+      
+      // Revalidate the profile page and the main dashboard to reflect changes
+      revalidatePath('/profile');
+      revalidatePath('/');
 
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    return {
-      success: false,
-      error: 'حدث خطأ أثناء تحديث البيانات.',
-    };
+      return { success: true };
+    } catch (error) {
+      console.error(`Error updating profile (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        return {
+          success: false,
+          error: 'حدث خطأ أثناء تحديث البيانات بعد عدة محاولات.',
+        };
+      }
+      await new Promise(res => setTimeout(res, 1000 * attempt));
+    }
   }
+
+  return {
+    success: false,
+    error: 'حدث خطأ غير متوقع.',
+  };
 }

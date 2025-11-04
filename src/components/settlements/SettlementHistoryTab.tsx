@@ -1,76 +1,77 @@
 
-"use client";
+'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from '@tanstack/react-query';
+import { getSettlements } from '@/app/actions/settlement-actions';
+import { type Settlement } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ServiceHistoryItem } from "@/types";
-import { format } from 'date-fns';
-import { arSA } from 'date-fns/locale';
-import { Clock, FileText, User } from "lucide-react";
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface SettlementHistoryTabProps {
-    historyItems: ServiceHistoryItem[];
+    employeeId: string;
 }
 
-const SettlementTypeBadge = ({ type }: { type: 'EndOfService' | 'LeaveSettlement' }) => {
-    if (type === 'EndOfService') {
-        return <Badge variant="destructive">إنهاء خدمة</Badge>;
-    }
-    return <Badge variant="secondary">تصفية إجازة</Badge>;
-};
+export default function SettlementHistoryTab({ employeeId }: SettlementHistoryTabProps) {
 
-export default function SettlementHistoryTab({ historyItems }: SettlementHistoryTabProps) {
-    const formatDate = (timestamp: any) => {
-        if (!timestamp) return 'N/A';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        if (isNaN(date.getTime())) return 'تاريخ غير صالح';
-        return format(date, 'PPP p', { locale: arSA });
+    const { data: history, isLoading, isError } = useQuery<Settlement[], Error>({
+        queryKey: ['settlementHistory', employeeId],
+        queryFn: async () => {
+            const { settlements, error } = await getSettlements(employeeId);
+            if (error) {
+                throw new Error(error);
+            }
+            return settlements || [];
+        },
+        enabled: !!employeeId,
+    });
+
+    const formatCurrency = (amount: number | undefined | null) => {
+        if (amount === undefined || amount === null) return 'N/A';
+        return new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR' }).format(amount);
     };
 
+    const formatDate = (date: any | undefined | null) => {
+        if (!date) return 'N/A';
+        const d = date.toDate ? date.toDate() : new Date(date);
+        return d.toLocaleDateString('ar-SA');
+    }
+
+    if (isLoading) return <LoadingSpinner />;
+    if (isError) return <p className="text-red-500">Error loading settlement history.</p>;
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>سجل عمليات التسوية</CardTitle>
-                <CardDescription>
-                    عرض لجميع عمليات تصفية المستحقات التي تمت في النظام.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[50vh] border rounded-md">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-background">
-                            <TableRow>
-                                <TableHead className="flex items-center gap-2"><User />اسم الموظف</TableHead>
-                                <TableHead><FileText />نوع التسوية</TableHead>
-                                <TableHead><Clock />تاريخ التنفيذ</TableHead>
-                                <TableHead className="text-left">المبلغ الإجمالي</TableHead>
+        <div className="mt-6">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>نوع التسوية</TableHead>
+                        <TableHead>تاريخ التسوية</TableHead>
+                        <TableHead>المبلغ الإجمالي</TableHead>
+                        <TableHead>تفاصيل</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {history && history.length > 0 ? (
+                        history.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell>
+                                    <Badge variant={item.type === "EndOfService" ? "destructive" : "secondary"}>
+                                        {item.type === "EndOfService" ? "نهاية خدمة" : "تسوية إجازة"}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{formatDate(item.calculationDate)}</TableCell>
+                                <TableCell>{formatCurrency(item.totalPayout)}</TableCell>
+                                <TableCell className="text-xs">{item.details}</TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {historyItems.length > 0 ? historyItems.map((item) => (
-                                <TableRow key={item.id}>
-                                    <TableCell className="font-medium">{item.employeeName}</TableCell>
-                                    <TableCell>
-                                        <SettlementTypeBadge type={item.type} />
-                                    </TableCell>
-                                    <TableCell>{formatDate(item.finalizedAt)}</TableCell>
-                                    <TableCell className="text-left font-semibold text-primary">
-                                        {(item.totalAmount ?? item.monetaryValue ?? 0).toLocaleString('ar-SA', { style: 'currency', currency: 'SAR' })}
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
-                                        لا توجد عمليات تسوية مسجلة حتى الآن.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
-            </CardContent>
-        </Card>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center">لا توجد سجلات تسوية.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </div>
     );
 }

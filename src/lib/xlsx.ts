@@ -1,34 +1,67 @@
-'use client';
-
 import * as XLSX from 'xlsx';
-import type { Worker } from '@/types';
-import { calculatePayroll, MONTHS } from './utils';
+import { Worker, PayrollData } from '@/types';
 
-export const exportToExcel = (workers: Worker[], year: number, month: number) => {
-  const monthName = MONTHS[month];
-  const tableData = workers.map(worker => {
-    const payroll = calculatePayroll(worker, year, month);
-    return {
-      'الموظف': worker.name,
-      'القسم': worker.department || '',
-      'الراتب الأساسي': worker.basicSalary || 0,
-      'بدل سكن': worker.housing || 0,
-      'بدل طبيعة عمل': worker.workNature || 0,
-      'بدل مواصلات': worker.transport || 0,
-      'بدل هاتف': worker.phone || 0,
-      'بدل طعام': worker.food || 0,
-      'عمولة': worker.commission || 0,
-      'أجر العمل الإضافي': payroll.overtimePay.toFixed(2),
-      'سلف': worker.advances || 0,
-      'جزاءات': worker.penalties || 0,
-      'خصم الغياب': payroll.absenceDeduction.toFixed(2),
-      'صافي الراتب': payroll.netSalary.toFixed(2),
-    };
+const sheetName = 'تصدير الرواتب'; // Sheet name in Arabic
+
+interface ExportPayrollParams {
+  workers: Worker[];
+  payrollData: { [workerId: string]: PayrollData };
+  month: string;
+  year: number;
+}
+
+export const exportPayrollToExcel = (params: ExportPayrollParams) => {
+  const { workers, payrollData, month, year } = params;
+
+  const headers = [
+    'الرقم الوظيفي',
+    'اسم الموظف',
+    'المسمى الوظيفي',
+    'الراتب الأساسي',
+    'بدل سكن',
+    'بدل مواصلات',
+    'بدل طعام',
+    'بدل طبيعة عمل',
+    'عمولات',
+    'إجمالي البدلات',
+    'أجر العمل الإضافي',
+    'إجمالي المستحق',
+    'سلف',
+    'جزاءات',
+    'خصم الغياب',
+    'إجمالي الاستقطاعات',
+    'صافي الراتب',
+  ];
+
+  const data = workers.map(worker => {
+    const payroll = payrollData[worker.id];
+    return [
+      worker.id,
+      worker.name,
+      worker.jobTitle,
+      worker.basicSalary || 0,
+      worker.housing || 0,
+      worker.transport || 0,
+      worker.food || 0,
+      worker.workNature || 0,
+      payroll?.commission || 0,
+      payroll?.allowances || 0,
+      payroll?.overtimePay || 0,
+      payroll?.grossSalary || 0,
+      payroll?.advances || 0,
+      payroll?.penalties || 0,
+      payroll?.absenceDeduction || 0,
+      payroll?.deductions || 0,
+      payroll?.netSalary || 0,
+    ];
   });
 
-  const worksheet = XLSX.utils.json_to_sheet(tableData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, `مسير رواتب ${monthName} ${year}`);
-  
-  XLSX.writeFile(workbook, `مسير_رواتب_${year}_${month + 1}.xlsx`);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  // Add a title row
+  XLSX.utils.sheet_add_aoa(ws, [[`مسير رواتب شهر ${month} ${year}`]], { origin: 'A1' });
+
+  XLSX.writeFile(wb, `payroll-${month}-${year}.xlsx`);
 };

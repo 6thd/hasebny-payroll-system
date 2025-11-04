@@ -1,5 +1,5 @@
 import { addDoc, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase/client';
 
 export async function logAudit(action: string, resource: string, userId: string, details = {}) {
   await addDoc(collection(db, 'auditLogs'), {

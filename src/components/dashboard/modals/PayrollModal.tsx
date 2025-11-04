@@ -1,214 +1,201 @@
-"use client";
-import { useState, useEffect, useRef } from 'react';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { Worker, PayrollData, MonthlyData } from '@/types';
-import { calculatePayroll, MONTHS } from '@/lib/utils';
-import PredictiveAnalysis from '../PredictiveAnalysis';
-import { exportToExcel } from '@/lib/xlsx';
-import { Printer, FileDown } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import LoadingSpinner from '../../LoadingSpinner';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getPayrollDetails, saveMonthlyData } from '@/app/actions/employee-actions';
+import { toast } from 'sonner';
+import { type Worker, type MonthlyData, PayrollData } from '@/types';
+import { calculatePayroll, MONTHS, processWorkerData } from '@/lib/utils';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface PayrollModalProps {
   isOpen: boolean;
   onClose: () => void;
-  workers: Worker[];
+  initialWorkers: Worker[];
   year: number;
   month: number;
 }
 
-export default function PayrollModal({ isOpen, onClose, workers: initialWorkers, year, month }: PayrollModalProps) {
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [payrolls, setPayrolls] = useState<{ [key: string]: PayrollData }>({});
-  const [isPrinting, setIsPrinting] = useState(false);
-  const { toast } = useToast();
-  const tableRef = useRef<HTMLTableElement>(null);
+export default function PayrollModal({ isOpen, onClose, initialWorkers, year, month }: PayrollModalProps) {
+  const queryClient = useQueryClient();
 
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [payroll, setPayroll] = useState<Partial<PayrollData>>({});
+  const [monthlyData, setMonthlyData] = useState<Partial<MonthlyData>>({});
+  const [serverError, setServerError] = useState<string | null>(null); // State to hold the specific server error
 
+  // When the modal closes, reset everything.
   useEffect(() => {
-    const fetchMonthlyData = async () => {
-        const salaryCollectionName = `salaries_${year}_${month + 1}`;
-        const monthlyDocsSnap = await getDocs(collection(db, salaryCollectionName));
-        const monthlyDataMap: { [employeeId: string]: MonthlyData } = {};
-        monthlyDocsSnap.forEach(doc => {
-            monthlyDataMap[doc.id] = doc.data() as MonthlyData;
-        });
+    if (!isOpen) {
+      setSelectedEmployeeId(null);
+      setPayroll({});
+      setMonthlyData({});
+      setServerError(null); // Reset server error on close
+      queryClient.removeQueries({ queryKey: ['payrollDetails']});
+    }
+  }, [isOpen, queryClient]);
 
-        const workersWithMonthlyData = initialWorkers.map(w => ({
-            ...w,
-            commission: monthlyDataMap[w.id]?.commission || 0,
-            advances: monthlyDataMap[w.id]?.advances || 0,
-            penalties: monthlyDataMap[w.id]?.penalties || 0,
-        }));
+  // Single, unified query to fetch all data. This is the definitive fix.
+  const { data: payrollDetails, isLoading, isError, isSuccess } = useQuery({
+    queryKey: ['payrollDetails', selectedEmployeeId, year, month],
+    queryFn: () => getPayrollDetails({ employeeId: selectedEmployeeId!, year, month }),
+    enabled: !!selectedEmployeeId,
+  });
+
+  // Effect to process the data once it's successfully fetched
+  useEffect(() => {
+    if (isSuccess && payrollDetails) {
+      if (payrollDetails.error) {
+        // If there's an error from the server, store it and reset data
+        setServerError(payrollDetails.error);
+        setPayroll({});
+        setMonthlyData({});
+        return;
+      }
+      // If successful, clear any previous errors
+      setServerError(null);
+
+      const { worker, monthlyData } = payrollDetails;
+      
+      if (worker) {
+        const processedWorker = processWorkerData(worker, year, month);
+        const finalWorkerData = { ...processedWorker, ...monthlyData };
         
-        setWorkers(workersWithMonthlyData);
-        recomputePayrolls(workersWithMonthlyData);
-    };
-
-    if (initialWorkers.length > 0 && isOpen) {
-        fetchMonthlyData();
+        setPayroll(calculatePayroll(finalWorkerData, year, month));
+        setMonthlyData(monthlyData || {});
+      } else {
+        setPayroll({});
+        setMonthlyData({});
+      }
     }
-  }, [initialWorkers, year, month, isOpen]);
+  }, [isSuccess, payrollDetails, year, month]);
 
 
-  const recomputePayrolls = (currentWorkers: Worker[]) => {
-    const newPayrolls: { [key: string]: PayrollData } = {};
-    currentWorkers.forEach(w => {
-      newPayrolls[w.id] = calculatePayroll(w, year, month);
-    });
-    setPayrolls(newPayrolls);
-  };
+  const mutation = useMutation({
+    mutationFn: (data: { employeeId: string; year: number; month: number; monthlyData: Partial<MonthlyData> }) => saveMonthlyData(data),
+    onSuccess: () => {
+      toast.success('تم حفظ البيانات الشهرية بنجاح.');
+      queryClient.invalidateQueries({ queryKey: ['payrollDetails', selectedEmployeeId, year, month] });
+      window.dispatchEvent(new CustomEvent('data-updated'));
+    },
+    onError: (error: Error) => toast.error(`فشل الحفظ: ${error.message}`),
+  });
 
-  const handleInputChange = (workerId: string, field: keyof Worker, value: string) => {
-    const updatedWorkers = workers.map(w =>
-      w.id === workerId ? { ...w, [field]: Number(value) || 0 } : w
-    );
-    setWorkers(updatedWorkers);
-    recomputePayrolls(updatedWorkers);
-  };
-
-  const handleSave = async (worker: Worker) => {
-    const { id, days, totalRegular, totalOvertime, absentDays, sickLeaveDays, annualLeaveDays, ...permanentWorkerData } = worker;
-    
-    // Data that is specific to the month
-    const monthlyData: MonthlyData = {
-        commission: worker.commission || 0,
-        advances: worker.advances || 0,
-        penalties: worker.penalties || 0,
-    };
-
-    try {
-      // Save monthly data to the specific salary collection for that month
-      const salaryCollectionName = `salaries_${year}_${month + 1}`;
-      await setDoc(doc(db, salaryCollectionName, worker.id), monthlyData);
-
-      toast({ title: `تم حفظ بيانات ${worker.name} الشهرية` });
-    } catch (error) {
-      toast({ title: 'خطأ', description: 'لم يتم حفظ البيانات الشهرية', variant: 'destructive' });
-      console.error("Error saving payroll data: ", error);
+  const handleEmployeeSelection = (employeeId: string) => {
+    if (employeeId !== selectedEmployeeId) {
+      setServerError(null); // Reset error on new selection
+      setSelectedEmployeeId(employeeId);
     }
   };
 
-  const handleExportToPdf = async () => {
-    if (!tableRef.current) return;
-    setIsPrinting(true);
-  
-    document.body.classList.add('printing-pdf');
-
-    const canvas = await html2canvas(tableRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    });
-    
-    document.body.classList.remove('printing-pdf');
-  
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'px',
-      format: [canvas.width, canvas.height]
-    });
-  
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-    pdf.save(`مسير_رواتب_${MONTHS[month]}_${year}.pdf`);
-    setIsPrinting(false);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setMonthlyData((prev) => ({ ...prev, [name]: parseFloat(value) || 0 }));
   };
+
+  const handleSave = () => {
+    if (!selectedEmployeeId) return;
+    mutation.mutate({ employeeId: selectedEmployeeId, year, month, monthlyData });
+  };
+
+  const renderValue = (value: number | undefined) => (value != null ? value.toFixed(2) : '0.00');
   
-  const financialFields: { key: keyof Worker, label: string }[] = [
-    { key: 'basicSalary', label: 'الأساسي' }, { key: 'housing', label: 'سكن' }, { key: 'workNature', label: 'طبيعة عمل' },
-    { key: 'transport', label: 'مواصلات' }, { key: 'phone', label: 'هاتف' }, { key: 'food', label: 'طعام' },
-  ];
-  // These fields are now monthly
-  const monthlyFields: { key: keyof Worker, label: string }[] = [
-     { key: 'commission', label: 'عمولة' },
-  ];
-  const deductionFields: { key: keyof Worker, label: string }[] = [
-    { key: 'advances', label: 'سلف' }, { key: 'penalties', label: 'جزاءات' },
-  ];
+  const worker = payrollDetails?.worker;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl flex flex-col h-[90vh]">
-        <DialogHeader className="no-print flex-shrink-0">
-          <DialogTitle>مسير رواتب شهر {MONTHS[month]} {year}</DialogTitle>
+      <DialogContent className="sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>مسير الرواتب - {MONTHS[month]} {year}</DialogTitle>
           <DialogDescription>
-            هنا يمكنك إدخال البيانات المالية المتغيرة شهرياً. لحفظ التغييرات اضغط على زر "حفظ" لكل موظف.
+            اختر موظفًا لعرض تفاصيل راتبه وإجراء التعديلات اللازمة مثل العمولات، السلف، والجزاءات.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow min-h-0 overflow-auto">
-          <div ref={tableRef} className="min-w-0">
-            <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                <TableRow>
-                    <TableHead rowSpan={2} className="w-[150px] sticky rtl:right-0 ltr:left-0 bg-background z-20">الموظف</TableHead>
-                    <TableHead colSpan={financialFields.length + monthlyFields.length + 1} className="text-center text-green-600">الاستحقاقات</TableHead>
-                    <TableHead colSpan={deductionFields.length + 1} className="text-center text-destructive">الاستقطاعات</TableHead>
-                    <TableHead rowSpan={2} className="text-primary">صافي الراتب</TableHead>
-                    <TableHead rowSpan={2} className="no-print">إجراءات</TableHead>
-                </TableRow>
-                <TableRow>
-                    {financialFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
-                    {monthlyFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
-                    <TableHead>إضافي</TableHead>
-                    {deductionFields.map(f => <TableHead key={f.key}>{f.label}</TableHead>)}
-                    <TableHead>غياب</TableHead>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {workers.map(worker => (
-                    <TableRow key={worker.id}>
-                    <TableCell className="font-semibold sticky rtl:right-0 ltr:left-0 bg-background z-10">{worker.name}</TableCell>
-                    {/* Permanent financial fields are read-only now */}
-                    {financialFields.map(f => (
-                        <TableCell key={f.key}>
-                            {(worker[f.key] as number || 0).toFixed(2)}
-                        </TableCell>
+
+         <div className="mb-4">
+            <Select onValueChange={handleEmployeeSelection} value={selectedEmployeeId || ''}>
+                <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="اختر موظفًا لعرض كشف الراتب..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {initialWorkers.map(w => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                     ))}
-                    {/* Monthly financial fields */}
-                     {monthlyFields.map(f => (
-                        <TableCell key={f.key}>
-                        <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
-                        </TableCell>
-                    ))}
-                    <TableCell className="text-green-600">{payrolls[worker.id]?.overtimePay.toFixed(2)}</TableCell>
-                    {/* Monthly deduction fields */}
-                    {deductionFields.map(f => (
-                        <TableCell key={f.key}>
-                        <Input type="number" value={worker[f.key] as number || ''} onChange={e => handleInputChange(worker.id, f.key, e.target.value)} className="w-24 min-w-[6rem]" />
-                        </TableCell>
-                    ))}
-                    <TableCell className="text-destructive">{payrolls[worker.id]?.absenceDeduction.toFixed(2)}</TableCell>
-                    <TableCell className="font-bold text-primary">{payrolls[worker.id]?.netSalary.toFixed(2)}</TableCell>
-                    <TableCell className="space-x-2 rtl:space-x-reverse no-print">
-                        <Button size="sm" onClick={() => handleSave(worker)}>حفظ</Button>
-                        {payrolls[worker.id] && <PredictiveAnalysis worker={worker} currentYear={year} currentMonth={month} />}
-                    </TableCell>
-                    </TableRow>
-                ))}
-                </TableBody>
-            </Table>
-            </div>
+                </SelectContent>
+            </Select>
         </div>
-        <DialogFooter className="no-print gap-2 flex-shrink-0 pt-4">
-            <Button onClick={() => exportToExcel(workers, year, month)} variant="outline" disabled={isPrinting}>
-                <FileDown className="ml-2 h-4 w-4" />
-                تصدير Excel
-            </Button>
-            <Button onClick={handleExportToPdf} variant="outline" disabled={isPrinting}>
-                {isPrinting ? <LoadingSpinner /> : <Printer className="ml-2 h-4 w-4" />}
-                {isPrinting ? 'جارٍ التصدير...' : 'تصدير PDF'}
-            </Button>
-            <DialogClose asChild>
-                <Button type="button" variant="secondary">إغلاق</Button>
-            </DialogClose>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-40"><LoadingSpinner /></div>
+        ) : (serverError || isError) ? (
+           // Display the detailed server error message
+           <div className="flex justify-center items-center h-40 p-4 bg-red-100 dark:bg-red-900/20 rounded-lg">
+             <p className="text-red-500 text-center font-mono">{serverError || 'حدث خطأ غير متوقع.'}</p>
+           </div>
+        ) : isSuccess && worker ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+            {/* Payroll Details Sections */}
+            <div className="col-span-1 space-y-2 p-4 border rounded-lg">
+                <h3 className="font-semibold text-lg mb-3">الاستحقاقات</h3>
+                <p><strong>الراتب الأساسي:</strong> {renderValue(payroll.basicSalary)}</p>
+                <p><strong>بدل سكن:</strong> {renderValue(worker?.housing)}</p>
+                <p><strong>بدل مواصلات:</strong> {renderValue(worker?.transport)}</p>
+                <p><strong>بدل طعام:</strong> {renderValue(worker?.food)}</p>
+                <hr className="my-2" />
+                <p><strong>أجر العمل الإضافي:</strong> {renderValue(payroll.overtimePay)}</p>
+                <hr className="my-2" />
+                 <div className="space-y-2">
+                    <label>عمولات</label>
+                    <Input type="number" name="commission" value={monthlyData.commission || ''} onChange={handleInputChange} placeholder="عمولات"/>
+                </div>
+                <hr className="my-2" />
+                <p className="font-bold text-lg">إجمالي الاستحقاقات: {renderValue(payroll.grossSalary)}</p>
+            </div>
+
+            <div className="col-span-1 space-y-2 p-4 border rounded-lg">
+                 <h3 className="font-semibold text-lg mb-3">الاستقطاعات</h3>
+                 <p><strong>خصم الغياب:</strong> {renderValue(payroll.absenceDeduction)}</p>
+                 <hr className="my-2" />
+                 <div className="space-y-2">
+                    <label>سلف</label>
+                    <Input type="number" name="advances" value={monthlyData.advances || ''} onChange={handleInputChange} placeholder="سلف"/>
+                 </div>
+                 <div className="space-y-2">
+                    <label>جزاءات</label>
+                    <Input type="number" name="penalties" value={monthlyData.penalties || ''} onChange={handleInputChange} placeholder="جزاءات" />
+                 </div>
+                 <hr className="my-2" />
+                 <p className="font-bold text-lg">إجمالي الاستقطاعات: {renderValue(payroll.deductions)}</p>
+            </div>
+
+            <div className="col-span-1 space-y-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <h3 className="font-semibold text-xl mb-4 text-center">ملخص راتب {worker.name}</h3>
+                <div className="flex justify-between items-center text-lg">
+                    <span>إجمالي الاستحقاقات</span>
+                    <span className="font-bold text-green-600">{renderValue(payroll.grossSalary)}</span>
+                </div>
+                 <div className="flex justify-between items-center text-lg">
+                    <span>إجمالي الاستقطاعات</span>
+                    <span className="font-bold text-red-600">{renderValue(payroll.deductions)}</span>
+                </div>
+                <hr className="my-3 border-t-2"/>
+                <div className="flex justify-between items-center text-2xl">
+                    <span className="font-bold">صافي الراتب</span>
+                    <span className="font-extrabold text-blue-700">{renderValue(payroll.netSalary)}</span>
+                </div>
+                 <Button onClick={handleSave} className="w-full mt-6" disabled={mutation.isPending}>
+                    {mutation.isPending ? 'جار الحفظ...' : 'حفظ التعديلات'}
+                </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إغلاق</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

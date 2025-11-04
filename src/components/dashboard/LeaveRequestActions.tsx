@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from 'react';
-import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import LoadingSpinner from '../LoadingSpinner';
 import { Check, X, Edit, ShieldAlert, Calendar as CalendarIcon } from 'lucide-react';
@@ -23,13 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-
-interface LeaveRequest {
-    id: string;
-    employeeName: string;
-    startDate: Timestamp;
-    endDate: Timestamp;
-}
+import { LeaveRequest } from '@/types';
 
 interface LeaveRequestActionsProps {
     request: LeaveRequest;
@@ -52,8 +45,8 @@ export default function LeaveRequestActions({
     const [newEndDate, setNewEndDate] = useState<Date | undefined>();
 
     const handleOpenEditModal = () => {
-        setNewStartDate(request.startDate.toDate());
-        setNewEndDate(request.endDate.toDate());
+        setNewStartDate(request.startDate as Date);
+        setNewEndDate(request.endDate as Date);
         setEditModalOpen(true);
     };
 

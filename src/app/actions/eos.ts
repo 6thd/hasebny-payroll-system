@@ -2,15 +2,15 @@
 'use server';
 
 import { z } from 'zod';
-import { collection, getDocs, query, where, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { FieldValue } from 'firebase-admin/firestore';
+import { adminDb as db } from '@/lib/firebase/admin';
 import type { Worker } from '@/types';
 import { calculateLeaveBalance } from './leave-balance';
 import { calcEOSB } from '@/lib/taxCompliance';
 
 
 const EndOfServiceInputSchema = z.object({
-  worker: z.any(), // Not ideal, but passing complex objects to server actions can be tricky with Zod.
+  worker: z.any(), 
   lastDayOfWork: z.date(),
   reasonForTermination: z.enum([
       'resignation', 
@@ -31,9 +31,6 @@ export type EndOfServiceOutput = {
   totalAmount: number;
 };
 
-// This function is no longer needed here as it's part of the leave-balance action
-// async function getAnnualLeaveTaken(employeeId: string, serviceStartDate: Date, serviceEndDate: Date): Promise<number> { ... }
-
 export async function calculateEndOfService(input: EndOfServiceInput): Promise<{ success: true; data: EndOfServiceOutput } | { success: false; error: string }> {
   const validation = EndOfServiceInputSchema.safeParse(input);
   if (!validation.success) {
@@ -53,7 +50,6 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
 
   const totalSalary = (worker.basicSalary || 0) + (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0);
   
-  // Use the centralized calcEOSB function
   const baseGratuity = calcEOSB(totalSalary, serviceDurationYears);
 
   let finalGratuity = 0;
@@ -81,9 +77,16 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
         break;
   }
 
-  // Calculate leave balance value using the dedicated action
-  const leaveBalanceResult = await calculateLeaveBalance({ employeeId: worker.id });
-  const leaveBalanceValue = leaveBalanceResult.success ? leaveBalanceResult.data.monetaryValue : 0;
+  const leaveBalanceResult = await calculateLeaveBalance({ 
+      worker: worker,
+      settlementDate: lastDayOfWork.toISOString()
+  });
+  
+  if (!leaveBalanceResult.success) {
+    return { success: false, error: `خطأ في حساب الإجازات: ${leaveBalanceResult.error}` };
+  }
+
+  const leaveBalanceValue = leaveBalanceResult.data.monetaryValue;
   
   const totalAmount = finalGratuity + leaveBalanceValue;
   
@@ -98,7 +101,6 @@ export async function calculateEndOfService(input: EndOfServiceInput): Promise<{
   return { success: true, data: result };
 }
 
-// --- Function to Finalize Termination ---
 const FinalizeTerminationInputSchema = z.object({
     employeeId: z.string(),
     terminationDate: z.date(),
@@ -121,24 +123,31 @@ export async function finalizeTermination(input: z.infer<typeof FinalizeTerminat
     const { employeeId, terminationDate, reasonForTermination, results } = validation.data;
 
     try {
-        const batch = writeBatch(db);
+        const employeesRef = db.collection('employees');
+        const q = employeesRef.where('id', '==', employeeId);
+        const querySnapshot = await q.get();
 
-        // 1. Update the main employee document
-        const employeeRef = doc(db, 'employees', employeeId);
+        if (querySnapshot.empty) {
+            return { success: false, error: `Employee with ID "${employeeId}" not found.` };
+        }
+
+        const employeeDoc = querySnapshot.docs[0];
+        const employeeRef = employeeDoc.ref;
+
+        const batch = db.batch();
+
         batch.update(employeeRef, {
             status: 'Terminated',
             terminationDate: terminationDate.toISOString().split('T')[0],
         });
 
-        // 2. Create a historical record in the sub-collection
-        const historyRef = doc(collection(employeeRef, 'serviceHistory'));
+        const historyRef = employeeRef.collection('serviceHistory').doc();
         batch.set(historyRef, {
             type: 'EndOfService',
             reasonForTermination,
             terminationDate,
-            finalizedAt: serverTimestamp(),
+            finalizedAt: FieldValue.serverTimestamp(),
             ...results,
-            // finalizedBy: auth.currentUser?.uid // You'd need to get the admin user's ID here
         });
 
         await batch.commit();

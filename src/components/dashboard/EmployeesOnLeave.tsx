@@ -6,7 +6,14 @@ import { Badge } from '../ui/badge';
 import { UserCheck, CalendarClock, UserX } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { LeaveRequest } from '@/types';
+import { Timestamp } from 'firebase/firestore';
 
+const getJsDate = (date: Date | Timestamp): Date => {
+    if (date instanceof Timestamp) {
+        return date.toDate();
+    }
+    return date;
+};
 
 const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
     annual: { label: 'سنوية', variant: 'secondary' },
@@ -31,7 +38,7 @@ const LeaveList = ({ title, leaves, icon }: { title: string, leaves: LeaveReques
                             <Badge variant={leaveTypeMap[leave.leaveType]?.variant || 'default'}>{leaveTypeMap[leave.leaveType]?.label || leave.leaveType}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                            من {leave.startDate.toDate().toLocaleDateString('ar-EG')} إلى {leave.endDate.toDate().toLocaleDateString('ar-EG')}
+                            من {getJsDate(leave.startDate).toLocaleDateString('ar-EG')} إلى {getJsDate(leave.endDate).toLocaleDateString('ar-EG')}
                         </p>
                     </li>
                 ))}

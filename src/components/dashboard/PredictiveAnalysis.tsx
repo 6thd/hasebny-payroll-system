@@ -8,7 +8,7 @@ import { Worker, MonthlyData } from '@/types';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import LoadingSpinner from '../LoadingSpinner';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase/client';
 import { calculatePayroll, MONTHS } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent } from '../ui/card';

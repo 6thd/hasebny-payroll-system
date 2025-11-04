@@ -80,8 +80,8 @@ export default function LeaveSettlementTab({ workers, onAction }: LeaveSettlemen
             <LeaveSettlementModal
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
-                worker={selectedWorker}
-                onAction={onAction}
+                workerId={selectedWorker.id}
+                workerName={selectedWorker.name}
             />
         )}
         </>

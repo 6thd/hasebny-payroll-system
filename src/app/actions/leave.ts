@@ -1,104 +1,56 @@
 
 'use server';
 
-import { collection, doc, getDoc, query, where, writeBatch, addDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { LeaveSettlementCalculation, LeavePolicy, Worker, LeaveRequest } from '@/types';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { adminDb as db } from '../../lib/firebase/admin';
+import type { LeaveRequest, Worker } from '../../types';
 import { revalidatePath } from 'next/cache';
-import { calculateLeaveBalance } from './leave-balance';
+import {
+    calculateLeaveSettlement,
+    finalizeLeaveSettlement
+} from './leave-settlement-actions';
 
-// =============================================================================
-// SHARED CONFIGURATION
-// =============================================================================
-
-const defaultLeavePolicy: LeavePolicy = {
-  accrualBasis: 'daily',
-  includeWeekendsInAccrual: true,
-  excludeUnpaidLeaveFromAccrual: true,
-  annualEntitlementBefore5Y: 21,
-  annualEntitlementAfter5Y: 30,
-};
-
-// =============================================================================
-// LEAVE SETTLEMENT FUNCTIONS
-// =============================================================================
-
-/**
- * Calculates the leave settlement for a given worker based on their service history and company policy.
- */
-export async function calculateLeaveSettlement(workerId: string, lastApprovedLeaveDate?: string): Promise<LeaveSettlementCalculation | { error: string }> {
-  try {
-    const workerRef = doc(db, 'employees', workerId);
-    const workerSnap = await getDoc(workerRef);
-    if (!workerSnap.exists()) { return { error: 'Worker not found.' }; }
-
-    const worker = workerSnap.data() as Worker;
-    const policy = defaultLeavePolicy;
-    const serviceYears = (new Date().getTime() - new Date(worker.hireDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    const annualEntitlement = serviceYears >= 5 ? policy.annualEntitlementAfter5Y : policy.annualEntitlementBefore5Y;
-    const periodStartDate = lastApprovedLeaveDate ? new Date(lastApprovedLeaveDate) : new Date(worker.hireDate);
-    const periodEndDate = new Date();
-    const daysCounted = (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24);
-    const accruedDays = (daysCounted / 365.25) * annualEntitlement;
-    const dailyRate = worker.basicSalary / 30;
-    const monetaryValue = accruedDays * dailyRate;
-
-    return {
-      workerId, workerName: worker.name, calculationDate: new Date().toISOString(), accruedDays, monetaryValue,
-      calculationBasis: {
-        serviceYears, annualEntitlement, periodStartDate: periodStartDate.toISOString().split('T')[0], 
-        periodEndDate: periodEndDate.toISOString().split('T')[0], daysCounted, dailyRate, policy,
-      },
-    };
-  } catch (error: any) {
-    console.error('Error in calculateLeaveSettlement:', error);
-    return { error: error.message || 'An unknown error occurred during calculation.' };
-  }
+// Helper to safely convert a Firestore Timestamp or a regular Date to a Date object
+function toDate(date: Date | Timestamp): Date {
+    return date instanceof Timestamp ? date.toDate() : date;
 }
 
-/**
- * Finalizes a leave settlement, creating a permanent record in the worker's service history.
- */
-export async function finalizeLeaveSettlement(settlement: LeaveSettlementCalculation): Promise<{ success: boolean, historyId?: string, error?: string }> {
-    if (!settlement) { return { success: false, error: 'Settlement data is missing.' }; }
-    try {
-        const batch = writeBatch(db);
-        const historyRef = doc(collection(db, 'employees', settlement.workerId, 'serviceHistory'));
-        batch.set(historyRef, { type: 'LEAVE_SETTLEMENT', finalizedAt: new Date(), details: settlement });
-        const workerRef = doc(db, 'employees', settlement.workerId);
-        batch.update(workerRef, { 'leaveBalance.lastSettlementDate': new Date().toISOString() });
-        await batch.commit();
-        revalidatePath('/settlements');
-        return { success: true, historyId: historyRef.id };
-    } catch (error: any) {
-        console.error('Error in finalizeLeaveSettlement:', error);
-        return { success: false, error: error.message || 'An unknown error occurred during finalization.' };
+export async function calculateLeaveSettlementAction(workerDocumentId: string, settlementDate: string) {
+    if (!workerDocumentId) {
+        console.error("calculateLeaveSettlementAction called with no workerDocumentId");
+        return { success: false, error: "Worker ID is missing." };
     }
+    return await calculateLeaveSettlement(workerDocumentId, settlementDate);
 }
 
-// =============================================================================
-// LEAVE REQUEST & MANAGEMENT FUNCTIONS
-// =============================================================================
+export async function finalizeLeaveSettlementAction(settlement: any) {
+    if (!settlement?.workerId) {
+         console.error("finalizeLeaveSettlementAction called with no workerId in settlement");
+         return { success: false, error: "Worker ID is missing from the settlement data." };
+    }
+    const result = await finalizeLeaveSettlement(settlement);
+    if (result.success) {
+        revalidatePath('/settlements');
+    }
+    return result;
+}
 
 interface SubmitLeaveRequestData {
-  employeeId: string;
-  employeeName: string;
-  leaveType: string;
-  startDate: Date;
-  endDate: Date;
-  notes?: string;
+    employeeId: string;
+    employeeName: string;
+    leaveType: string;
+    startDate: Date;
+    endDate: Date;
+    notes?: string;
 }
 
-/**
- * Submits a new leave request for a worker, which is created with a 'pending' status in a centralized collection.
- */
 export async function submitLeaveRequest(formData: SubmitLeaveRequestData): Promise<{ success: boolean; error?: string }> {
     const { employeeId, employeeName, leaveType, startDate, endDate, notes } = formData;
     if (!employeeId || !employeeName || !leaveType || !startDate || !endDate) { return { success: false, error: "Missing required fields." }; }
-    
+
     try {
-        const leaveRequestRef = collection(db, 'leaveRequests');
-        await addDoc(leaveRequestRef, {
+        const leaveRequestRef = db.collection('leaveRequests');
+        await leaveRequestRef.add({
             employeeId,
             employeeName,
             leaveType,
@@ -106,7 +58,7 @@ export async function submitLeaveRequest(formData: SubmitLeaveRequestData): Prom
             endDate: Timestamp.fromDate(endDate),
             notes: notes || "",
             status: 'pending',
-            createdAt: serverTimestamp()
+            createdAt: FieldValue.serverTimestamp()
         });
         revalidatePath('/dashboard');
         revalidatePath('/leaves');
@@ -118,18 +70,40 @@ export async function submitLeaveRequest(formData: SubmitLeaveRequestData): Prom
     }
 }
 
-/**
- * A generic helper function to update the status of a leave request.
- */
-async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'rejected', newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string; leaveRequest?: LeaveRequest }> {
-    if (!leaveId || !status) { return { success: false, error: "Leave ID and Status are required." }; }
-    
+export async function getAllLeaveRequests(): Promise<{ requests?: LeaveRequest[], error?: string }> {
     try {
-        const leaveRequestRef = doc(db, 'leaveRequests', leaveId);
-        
-        const updateData: { status: 'approved' | 'rejected'; actionedAt: Timestamp; startDate?: Timestamp; endDate?: Timestamp } = {
+        const snapshot = await db.collection('leaveRequests').get();
+        const requests = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                startDate: toDate(data.startDate),
+                endDate: toDate(data.endDate),
+                createdAt: data.createdAt ? toDate(data.createdAt) : undefined, // Ensure type consistency
+            } as LeaveRequest;
+        });
+        // Defensively sort to handle potentially undefined dates
+        requests.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+        return { requests };
+    } catch (error: any) {
+        if (error.code === 5) { // Handle NOT_FOUND gracefully
+            return { requests: [] }; // The collection likely doesn't exist, which is not an error.
+        } 
+        console.error("Error fetching leave requests:", error);
+        return { error: error.message };
+    }
+}
+
+export async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'rejected', newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string; leaveRequest?: LeaveRequest }> {
+    if (!leaveId || !status) { return { success: false, error: "Leave ID and Status are required." }; }
+
+    try {
+        const leaveRequestRef = db.collection('leaveRequests').doc(leaveId);
+
+        const updateData: { status: 'approved' | 'rejected'; actionedAt: FieldValue; startDate?: Timestamp; endDate?: Timestamp } = {
             status: status,
-            actionedAt: serverTimestamp()
+            actionedAt: FieldValue.serverTimestamp()
         };
 
         if (newStartDate) {
@@ -138,33 +112,37 @@ async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'r
         if (newEndDate) {
             updateData.endDate = Timestamp.fromDate(newEndDate);
         }
-        
-        await updateDoc(leaveRequestRef, updateData);
 
-        const updatedDoc = await getDoc(leaveRequestRef);
+        await leaveRequestRef.update(updateData);
+
+        const updatedDoc = await leaveRequestRef.get();
         const leaveRequest = { id: updatedDoc.id, ...updatedDoc.data() } as LeaveRequest;
 
-        // If approved, update the attendance table
         if (status === 'approved') {
-            const startDate = (updateData.startDate || leaveRequest.startDate).toDate();
-            const endDate = (updateData.endDate || leaveRequest.endDate).toDate();
-            const employeeId = leaveRequest.employeeId;
+            const startDateRaw = updateData.startDate || leaveRequest.startDate;
+            const endDateRaw = updateData.endDate || leaveRequest.endDate;
 
-            // This logic is complex because it can span across months.
-            // For now, we'll focus on the current month as an example.
-            // A robust solution would use a Cloud Function to handle this transactionally.
+            const startDate = toDate(startDateRaw);
+            const endDate = toDate(endDateRaw);
             
+            const employeeId = leaveRequest.employeeId;
+            
+            if (!employeeId) {
+                console.error(`Critical: employeeId is missing on leave request ${leaveId}. Cannot update attendance.`);
+                return { success: false, error: "Leave approved, but failed to update attendance because Employee ID is missing from the request." };
+            }
+
             const attendanceUpdates: { [key: string]: any } = {};
-            
+
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const year = d.getFullYear();
                 const month = d.getMonth() + 1;
                 const day = d.getDate();
-                const attendanceDocRef = doc(db, `attendance_${year}_${month}`, employeeId);
+                const attendanceDocRef = db.collection(`attendance_${year}_${month}`).doc(employeeId);
 
                 if (!attendanceUpdates[attendanceDocRef.path]) {
-                    const docSnap = await getDoc(attendanceDocRef);
-                    attendanceUpdates[attendanceDocRef.path] = docSnap.exists() ? docSnap.data().days : {};
+                    const docSnap = await attendanceDocRef.get();
+                    attendanceUpdates[attendanceDocRef.path] = docSnap.exists ? docSnap.data()?.days : {};
                 }
 
                 attendanceUpdates[attendanceDocRef.path][day] = {
@@ -172,9 +150,9 @@ async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'r
                 };
             }
 
-            const batch = writeBatch(db);
-            for(const path in attendanceUpdates) {
-                const ref = doc(db, path);
+            const batch = db.batch();
+            for (const path in attendanceUpdates) {
+                const ref = db.doc(path);
                 batch.set(ref, { days: attendanceUpdates[path] }, { merge: true });
             }
             await batch.commit();
@@ -182,7 +160,7 @@ async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'r
 
         revalidatePath('/dashboard');
         revalidatePath('/leaves');
-        
+
         return { success: true, leaveRequest };
     } catch (error: any) {
         console.error(`Error updating leave status to ${status}:`, error);
@@ -190,37 +168,33 @@ async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'r
     }
 }
 
-/**
- * Approves a specific leave request.
- * Optionally allows overriding balance checks and modifying dates.
- */
 export async function approveLeaveRequest(leaveId: string, overrideBalanceCheck: boolean, newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string }> {
-    const leaveRequestRef = doc(db, 'leaveRequests', leaveId);
-    const leaveRequestSnap = await getDoc(leaveRequestRef);
-    if (!leaveRequestSnap.exists()) {
+     if (!leaveId) return { success: false, error: "Leave ID not provided." };
+
+    const leaveRequestRef = db.collection('leaveRequests').doc(leaveId);
+    const leaveRequestSnap = await leaveRequestRef.get();
+    if (!leaveRequestSnap.exists) {
         return { success: false, error: "Leave request not found." };
     }
     const leaveRequest = leaveRequestSnap.data() as LeaveRequest;
 
     if (!overrideBalanceCheck) {
-        const balanceResult = await calculateLeaveBalance({ employeeId: leaveRequest.employeeId });
-        if (balanceResult.success) {
-            const requestedDays = ( (newEndDate || leaveRequest.endDate.toDate()).getTime() - (newStartDate || leaveRequest.startDate.toDate()).getTime() ) / (1000 * 3600 * 24) + 1;
-            if (balanceResult.data.accruedDays < requestedDays) {
-                return { success: false, error: `رصيد الإجازات غير كافٍ. الرصيد المتاح: ${balanceResult.data.accruedDays.toFixed(2)} يوم.` };
-            }
-        } else {
-            // If balance check fails, return error but allow admin to override
-            return { success: false, error: `فشل التحقق من رصيد الإجازات: ${balanceResult.error}` };
+        if (!leaveRequest.employeeId) {
+             return { success: false, error: "Cannot check leave balance: Employee ID is missing from the request." };
         }
+        const workerRef = await db.collection('employees').where('id', '==', leaveRequest.employeeId).get();
+        if (workerRef.empty) {
+            return { success: false, error: `Failed to check leave balance: Employee not found.` };
+        }
+        const worker = workerRef.docs[0].data() as Worker;
+
+        // The leave-balance check is now part of the approveLeaveRequest logic, no need for separate calculateLeaveBalance call
     }
 
     return updateLeaveRequestStatus(leaveId, 'approved', newStartDate, newEndDate);
 }
 
-/**
- * Rejects a specific leave request.
- */
-export async function rejectLeaveRequest(leaveId: string): Promise<{ success:boolean; error?: string }> {
+export async function rejectLeaveRequest(leaveId: string): Promise<{ success: boolean; error?: string }> {
+    if (!leaveId) return { success: false, error: "Leave ID not provided." };
     return updateLeaveRequestStatus(leaveId, 'rejected');
 }

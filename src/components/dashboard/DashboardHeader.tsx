@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { AppUser, Worker } from '@/types';
-import { MONTHS } from '@/lib/utils';
+import { auth } from '../../lib/firebase/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Button } from "../ui/button";
+import { AppUser, Worker } from '../../types';
+import { MONTHS } from '../../lib/utils';
 import { LogOut, Users, CircleDollarSign, BarChart3, ChevronDown, Landmark, User as UserIcon, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PayrollModal from './modals/PayrollModal';
@@ -99,7 +99,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
              <div className="flex items-center gap-2">
               <Select
                 value={String(date.month)}
-                onValueChange={(value) => onDateChange({ ...date, month: Number(value) })}
+                onValueChange={(value: string) => onDateChange({ ...date, month: Number(value) })}
               >
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="الشهر" />
@@ -112,7 +112,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
               </Select>
               <Select
                 value={String(date.year)}
-                onValueChange={(value) => onDateChange({ ...date, year: Number(value) })}
+                onValueChange={(value: string) => onDateChange({ ...date, year: Number(value) })}
               >
                 <SelectTrigger className="w-[100px]">
                   <SelectValue placeholder="السنة" />
@@ -156,7 +156,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
         <PayrollModal
           isOpen={isPayrollModalOpen}
           onClose={() => setPayrollModalOpen(false)}
-          workers={workers}
+          initialWorkers={workers}
           year={date.year}
           month={date.month}
         />
@@ -166,7 +166,7 @@ export default function DashboardHeader({ user, date, onDateChange, isAdmin, wor
         <EmployeeManagementModal
           isOpen={isEmployeeModalOpen}
           onClose={() => setEmployeeModalOpen(false)}
-          workers={workers}
+          initialWorkers={workers}
           onDataUpdate={onDataUpdate}
         />
       }

@@ -1,173 +1,126 @@
 
-"use client";
+'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { calculateLeaveSettlement, finalizeLeaveSettlement } from '@/app/actions/leave';
-import type { Worker, LeaveSettlementCalculation, LeavePolicy } from '@/types';
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { toast } from 'sonner';
+import { calculateLeaveSettlement, finalizeLeaveSettlement } from '@/app/actions/leave-settlement-actions';
+import type { LeaveSettlementCalculation } from '@/types';
+import { Label } from '../ui/label';
 
 interface LeaveSettlementModalProps {
-  worker: Worker & { lastApprovedLeaveDate?: string };
   isOpen: boolean;
   onClose: () => void;
-  onAction: () => void;
+  workerId: string;
+  workerName: string;
 }
 
-const ResultRow = ({ label, value }: { label: string; value: string | number | undefined }) => (
-    <div className="flex justify-between items-center py-2 border-b border-border/50">
-        <span className="text-sm text-muted-foreground">{label}</span>
-        <span className="font-semibold text-md text-foreground">{value ?? 'N/A'}</span>
-    </div>
-);
-
-
-export default function LeaveSettlementModal({ worker, isOpen, onClose, onAction }: LeaveSettlementModalProps) {
-  const [step, setStep] = useState<'initial' | 'calculating' | 'results' | 'finalizing'>('initial');
-  const [results, setResults] = useState<LeaveSettlementCalculation | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function LeaveSettlementModal({ isOpen, onClose, workerId, workerName }: LeaveSettlementModalProps) {
+  const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [calculationResult, setCalculationResult] = useState<LeaveSettlementCalculation | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const handleCalculate = async () => {
-    setError(null);
-    setStep('calculating');
+    setIsCalculating(true);
+    setCalculationResult(null);
     try {
-      const result = await calculateLeaveSettlement(worker.id, worker.lastApprovedLeaveDate);
-      if (result.error) {
-        throw new Error(result.error);
+      const { settlement, error } = await calculateLeaveSettlement(workerId, settlementDate);
+      if (error) {
+        toast.error(`خطأ في الحساب: ${error}`);
+      } else if (settlement) {
+        setCalculationResult(settlement);
+        toast.success('تم الحساب بنجاح.');
       }
-      setResults(result as LeaveSettlementCalculation);
-      setStep('results');
-    } catch (e: any) {
-      console.error("Calculation failed:", e);
-      setError(e.message || "Failed to calculate settlement.");
-      setStep('initial');
+    } catch (error: any) {
+      toast.error(`فشل الحساب: ${error.message}`);
+    } finally {
+      setIsCalculating(false);
     }
   };
 
   const handleFinalize = async () => {
-    if (!results) return;
-    setStep('finalizing');
+    if (!calculationResult) return;
+    setIsFinalizing(true);
     try {
-        const finalizationResult = await finalizeLeaveSettlement(results);
-        if (finalizationResult.error) {
-            throw new Error(finalizationResult.error);
+        const result = await finalizeLeaveSettlement(calculationResult);
+        if (result.success) {
+            toast.success('تمت تسوية الإجازة بنجاح!');
+            onClose(); // Close modal on success
+        } else {
+            toast.error(`فشل في تسوية الإجازة: ${result.error}`);
         }
-        toast.success(`تمت تصفية مستحقات الموظف ${worker.name} بنجاح.`);
-        onAction(); 
-        handleClose();
-    } catch (e: any) {
-        console.error("Finalization failed:", e);
-        setError(e.message || "فشلت عملية التصفية النهائية.");
-        toast.error(e.message || "فشلت عملية التصفية النهائية.");
-        setStep('results'); // Go back to results step on failure
+    } catch (error: any) {
+        toast.error(`حدث خطأ غير متوقع: ${error.message}`);
+    } finally {
+        setIsFinalizing(false);
     }
   };
   
-  const handleClose = () => {
-    onClose();
-    // Reset state after a short delay to allow the dialog to close
-    setTimeout(() => {
-        setStep('initial');
-        setResults(null);
-        setError(null);
-    }, 300);
+  // Helper to format date from various types
+  const formatDate = (date: any) => {
+      if (!date) return 'N/A';
+      // Handle Firestore Timestamp, ISO string, or Date object
+      const d = date.toDate ? date.toDate() : new Date(date);
+      return d.toLocaleDateString('ar-SA');
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-2xl">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>تصفية رصيد الإجازات السنوية للموظف: {worker.name}</DialogTitle>
-           <DialogDescription>
-            هذه النافذة تسمح لك بحساب وتصفية رصيد الإجازات السنوية للموظف. سيتم إنشاء سجل في تاريخ خدمة الموظف بالنتيجة.
-          </DialogDescription>
+          <DialogTitle>تسوية رصيد الإجازات لـ {workerName}</DialogTitle>
+          <DialogDescription>حساب وتصفية رصيد الإجازة السنوي للموظف.</DialogDescription>
         </DialogHeader>
+        
+        <div className="py-4 space-y-4">
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="settlement-date" className="whitespace-nowrap">تاريخ التسوية</Label>
+            <Input
+              id="settlement-date"
+              type="date"
+              value={settlementDate}
+              onChange={(e) => setSettlementDate(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <Button onClick={handleCalculate} disabled={isCalculating || !settlementDate} className="w-full">
+            {isCalculating ? 'جارٍ الحساب...' : 'حساب الرصيد المستحق'}
+          </Button>
+        </div>
 
-        {error && (
-            <Alert variant="destructive">
-                <AlertTitle>حدث خطأ</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-            </Alert>
-        )}
+        {calculationResult && (
+          <div className="mt-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 space-y-2 text-sm">
+            <h3 className="font-semibold text-lg text-center mb-3">نتائج الحساب</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              <p className="font-semibold">إجمالي الأيام المستحقة:</p>
+              <p>{calculationResult.accruedDays?.toFixed(2) || 'N/A'}</p>
+              
+              <p className="font-semibold">القيمة النقدية:</p>
+              <p>{calculationResult.monetaryValue?.toFixed(2) || 'N/A'} ريال</p>
 
-        {step === 'initial' && (
-            <div className="py-6 text-center">
-                <p className="mb-4">اضغط على الزر أدناه لحساب المستحقات بناءً على آخر إجازة معتمدة للموظف بتاريخ {worker.lastApprovedLeaveDate || 'غير محدد'}.</p>
-                <Button onClick={handleCalculate} size="lg">
-                    بدء الحساب
-                </Button>
-            </div>
-        )}
+              <p className="font-semibold">سنوات الخدمة:</p>
+              <p>{calculationResult.calculationBasis?.serviceYears?.toFixed(2) || 'N/A'}</p>
+              
+              <p className="font-semibold">الاستحقاق السنوي:</p>
+              <p>{calculationResult.calculationBasis?.annualEntitlement || 'N/A'} يوم</p>
 
-        {(step === 'calculating' || step === 'finalizing') && (
-            <div className="py-10">
-                <LoadingSpinner />
-                <p className="text-center mt-4">{step === 'calculating' ? 'جاري حساب المستحقات...' : 'جاري تنفيذ التصفية النهائية...'}</p>
-            </div>
-        )}
-
-        {step === 'results' && results && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4">
-            
-            {/* Left Column: Calculation Breakdown */}
-            <div className="flex flex-col space-y-4 p-4 bg-muted/50 rounded-lg">
-                 <div className="text-center bg-primary/10 text-primary p-4 rounded-lg">
-                    <p className="font-semibold">رصيد الأيام المستحقة</p>
-                    <p className="text-4xl font-bold tracking-tighter">
-                        {results.accruedDays.toFixed(2)} يوم
-                    </p>
-                </div>
-                 <div className="text-center bg-primary/10 text-primary p-4 rounded-lg">
-                    <p className="font-semibold">المبلغ المالي المستحق</p>
-                     <p className="text-3xl font-bold tracking-tighter">
-                        {results.monetaryValue.toLocaleString('ar-SA', { style: 'currency', currency: 'SAR' })}
-                    </p>
-                </div>
-            </div>
-
-            {/* Right Column: Details */}
-            <div className="space-y-2">
-                <h4 className="font-semibold text-md text-foreground">تفاصيل الحساب</h4>
-                <ResultRow label="سنوات الخدمة" value={results.calculationBasis.serviceYears.toFixed(2)} />
-                <ResultRow label="الاستحقاق السنوي الحالي" value={`${results.calculationBasis.annualEntitlement} يوم`} />
-                <ResultRow label="تاريخ بداية الفترة" value={results.calculationBasis.periodStartDate} />
-                <ResultRow label="تاريخ نهاية الفترة" value={results.calculationBasis.periodEndDate} />
-                <ResultRow label="الأيام المحسوبة في الفترة" value={`${results.calculationBasis.daysCounted} يوم`} />
-                
-                <Alert className="mt-4">
-                    <Terminal className="h-4 w-4" />
-                    <AlertTitle className="mr-4">السياسة المطبقة (افتراضية)</AlertTitle>
-                    <AlertDescription>
-                        <pre className="mt-2 w-full text-xs rounded-md bg-background p-4 text-foreground/80 overflow-x-auto">
-                            {JSON.stringify(results.calculationBasis.policy, null, 2)}
-                        </pre>
-                    </AlertDescription>
-                </Alert>
+              <p className="font-semibold">فترة الحساب:</p>
+              <p>{formatDate(calculationResult.calculationBasis?.periodStartDate)} - {formatDate(calculationResult.calculationBasis?.periodEndDate)}</p>
+              
+              <p className="font-semibold">الأيام المحتسبة:</p>
+              <p>{calculationResult.calculationBasis?.daysCounted || 'N/A'} يوم</p>
             </div>
           </div>
         )}
 
-        <DialogFooter className="mt-4">
-            <DialogClose asChild>
-                <Button variant="outline">إغلاق</Button>
-            </DialogClose>
-            {step === 'results' && (
-                 <Button onClick={handleFinalize}>
-                    تأكيد وتنفيذ التصفية النهائية
-                </Button>
-            )}
+        <DialogFooter className='mt-4'>
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button onClick={handleFinalize} disabled={!calculationResult || isFinalizing}>
+            {isFinalizing ? 'جارٍ الحفظ...' : 'اعتماد وتسوية'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

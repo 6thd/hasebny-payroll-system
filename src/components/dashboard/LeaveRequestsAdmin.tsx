@@ -11,6 +11,17 @@ import { Badge } from '../ui/badge';
 import { Briefcase } from 'lucide-react';
 import LeaveRequestActions from './LeaveRequestActions';
 import { LeaveRequest } from '@/types';
+import { Timestamp } from 'firebase/firestore';
+
+const getJsDate = (date: string | Date | Timestamp): Date => {
+    if (typeof date === 'string') {
+        return new Date(date);
+    }
+    if (date instanceof Timestamp) {
+        return date.toDate();
+    }
+    return date;
+};
 
 const leaveTypeMap: { [key: string]: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } } = {
     annual: { label: 'سنوية', variant: 'secondary' },
@@ -84,7 +95,7 @@ export default function LeaveRequestsAdmin({ requests, loading, onAction }: Leav
                                     <TableCell className="font-medium whitespace-nowrap">{req.employeeName}</TableCell>
                                     <TableCell><Badge variant={leaveTypeMap[req.leaveType]?.variant || 'default'}>{leaveTypeMap[req.leaveType]?.label || req.leaveType}</Badge></TableCell>
                                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                                        {req.startDate.toDate().toLocaleDateString('ar-EG')} - {req.endDate.toDate().toLocaleDateString('ar-EG')}
+                                        {getJsDate(req.startDate).toLocaleDateString('ar-EG')} - {getJsDate(req.endDate).toLocaleDateString('ar-EG')}
                                     </TableCell>
                                     <TableCell className="text-center space-x-1 rtl:space-x-reverse">
                                        <LeaveRequestActions 

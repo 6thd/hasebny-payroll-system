@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { type Worker, type PayrollData, DayData } from "@/types";
@@ -9,47 +10,52 @@ export function cn(...inputs: ClassValue[]) {
 const REGULAR_HOURS_PER_DAY = 8;
 
 export function calculatePayroll(worker: Worker | null, year: number, month: number): PayrollData {
+  // Ensure a full PayrollData object is always returned.
   if (!worker) {
-    return { overtimePay: 0, absenceDeduction: 0, netSalary: 0, totalAllowances: 0, grossSalary: 0, totalDeductions: 0 };
+    return { 
+      month: MONTHS[month], 
+      year, 
+      basicSalary: 0, 
+      allowances: 0, 
+      deductions: 0, 
+      netSalary: 0, 
+      isPaid: false, 
+      overtimePay: 0, 
+      absenceDeduction: 0, 
+      grossSalary: 0 
+    };
   }
   
-  // 1. حساب إجمالي الاستحقاقات (بدون العمل الإضافي) ليكون أساس الخصم
   const totalAllowances = (worker.housing || 0) + (worker.workNature || 0) + (worker.transport || 0) + (worker.phone || 0) + (worker.food || 0) + (worker.commission || 0);
   const deductibleGrossSalary = (worker.basicSalary || 0) + totalAllowances;
-  
-  // 2. حساب معدل الأجر اليومي
-  //    (يتم القسمة على 30 دائماً حسب المتبع في أنظمة الرواتب السعودية)
   const dailyRate = deductibleGrossSalary / 30;
-  
-  // 3. حساب قيمة خصم الغياب والإجازات
-  const hourlyRate = ((worker.basicSalary || 0) / 30) / REGULAR_HOURS_PER_DAY; // أجر الإضافي يحسب على الأساسي فقط
+  const hourlyRate = ((worker.basicSalary || 0) / 30) / REGULAR_HOURS_PER_DAY;
   const overtimePay = (worker.totalOvertime || 0) * hourlyRate * 1.5;
   const absenceAndLeaveDays = (worker.absentDays || 0) + (worker.annualLeaveDays || 0) + (worker.sickLeaveDays || 0);
   const absenceDeduction = dailyRate * absenceAndLeaveDays;
-
-  // 4. حساب إجمالي الاستحقاقات
   const grossSalary = deductibleGrossSalary + overtimePay;
-
-  // 5. حساب إجمالي الاستقطاعات
   const totalDeductions = absenceDeduction + (worker.advances || 0) + (worker.penalties || 0);
-  
-  // 6. حساب صافي الراتب
   const netSalary = grossSalary - totalDeductions;
   
   return { 
+      month: MONTHS[month],
+      year,
+      basicSalary: worker.basicSalary || 0,
+      allowances: parseFloat(totalAllowances.toFixed(2)),
+      deductions: parseFloat(totalDeductions.toFixed(2)),
+      netSalary: parseFloat(netSalary.toFixed(2)),
+      isPaid: false, // Default value
       overtimePay: parseFloat(overtimePay.toFixed(2)),
       absenceDeduction: parseFloat(absenceDeduction.toFixed(2)),
-      netSalary: parseFloat(netSalary.toFixed(2)),
-      totalAllowances: parseFloat(totalAllowances.toFixed(2)),
       grossSalary: parseFloat(grossSalary.toFixed(2)),
-      totalDeductions: parseFloat(totalDeductions.toFixed(2)),
   };
 }
 
 
 export function processWorkerData(worker: Worker, year: number, month: number): Worker {
+  // Return the worker as is if no days data is present.
   if (!worker || typeof worker.days === 'undefined') {
-    return { ...worker, totalRegular: 0, totalOvertime: 0, absentDays: 0, annualLeaveDays: 0, sickLeaveDays: 0 };
+    return { ...worker, id: worker.id, totalRegular: 0, totalOvertime: 0, absentDays: 0, annualLeaveDays: 0, sickLeaveDays: 0 };
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -77,7 +83,8 @@ export function processWorkerData(worker: Worker, year: number, month: number): 
       }
     }
   }
-  return { ...worker, totalRegular, totalOvertime, absentDays, annualLeaveDays, sickLeaveDays };
+  // Explicitly return the id to ensure it's not lost.
+  return { ...worker, id: worker.id, totalRegular, totalOvertime, absentDays, annualLeaveDays, sickLeaveDays };
 }
 
 export function getFridaysInMonth(year: number, month: number): number[] {
