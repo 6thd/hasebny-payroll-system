@@ -1,4 +1,3 @@
-
 #!/bin/bash
 echo "===================================================================="
 echo "== This script will upload your project to GitHub.                =="
@@ -16,9 +15,9 @@ fi
 echo "Adding all files..."
 git add .
 
-# Prompt for a commit message
-echo "Please enter a commit message for your changes:"
-read commit_message
+# Use a default commit message
+commit_message="feat: Finalize system features and documentation"
+echo "Using commit message: $commit_message"
 
 # Commit the files with the provided message
 echo "Committing files..."
@@ -28,25 +27,19 @@ else
   git commit -m "$commit_message"
 fi
 
-# Check if the remote 'origin' already exists
+# Check if the origin remote is set
 if ! git remote get-url origin > /dev/null 2>&1; then
-  echo "Adding GitHub repository as a remote..."
-  git remote add origin https://github.com/6thd/hasebny-payroll-system.git
+  echo "GitHub remote 'origin' not found. Please enter the remote URL (e.g., https://github.com/user/repo.git):"
+  read remote_url
+  git remote add origin "$remote_url"
 else
-  echo "Remote 'origin' already exists."
-  git remote set-url origin https://github.com/6thd/hasebny-payroll-system.git
+  echo "GitHub remote 'origin' already set."
 fi
 
-# Pull latest changes from GitHub before pushing
-echo "Pulling latest changes from GitHub..."
-git pull origin main --rebase
-
-# Push the code to GitHub
-echo "Pushing files to GitHub..."
+# Push the changes to the main branch
+echo "Pushing changes to GitHub..."
 git push -u origin main
 
-echo ""
 echo "===================================================================="
-echo "== Done! Your files have been uploaded to your GitHub repository. =="
+echo "== Project successfully pushed to GitHub!                         =="
 echo "===================================================================="
-read -p "Press any key to continue..."
