@@ -3,9 +3,27 @@
 
 import { adminDb } from '../../lib/firebase/admin';
 import type { Worker, MonthlyData, PayrollData } from "../../types";
-import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { Timestamp, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 const EMPLOYEE_COLLECTION = 'employees';
+
+// Helper to safely convert a string or Date to a JS Date object
+const toJsDate = (date: any): Date | null => {
+    if (!date) return null;
+    if (date instanceof Date) return date;
+    if (typeof date === 'string') {
+        const d = new Date(date);
+        if (!isNaN(d.getTime())) {
+            return d;
+        }
+    }
+    // Handle Firestore Timestamps on the server
+    if (date.toDate && typeof date.toDate === 'function') {
+        return date.toDate();
+    }
+    return null;
+};
+
 
 // New, consolidated function to get all data needed for the payroll modal
 export async function getPayrollDetails(payload: { employeeId: string; year: number; month: number; }) {
@@ -26,7 +44,12 @@ export async function getPayrollDetails(payload: { employeeId: string; year: num
             return { error: errorMessage };
         }
 
-        const worker = { id: workerDoc.id, ...workerDoc.data() } as Worker;
+        const workerData = workerDoc.data();
+        if (workerData?.hiringDate) {
+            workerData.hiringDate = workerData.hiringDate.toDate().toISOString().split('T')[0];
+        }
+
+        const worker = { id: workerDoc.id, ...workerData } as Worker;
         
         const monthlyData = monthlyDataDoc.exists ? monthlyDataDoc.data() as MonthlyData : { advances: 0, penalties: 0, commission: 0 };
 
@@ -87,7 +110,13 @@ export async function getEmployee(payload: { employeeId: string }) {
         if (!doc.exists) {
             return { error: 'Worker not found' };
         }
-        return { worker: { id: doc.id, ...doc.data() } as Worker };
+        const workerData = doc.data();
+        // Convert hiringDate to a simple YYYY-MM-DD string for the client-side date input
+        if (workerData?.hiringDate && workerData.hiringDate.toDate) {
+            workerData.hiringDate = workerData.hiringDate.toDate().toISOString().split('T')[0];
+        }
+
+        return { worker: { id: doc.id, ...workerData } as Worker };
     } catch (error: any) {
         return { error: error.message };
     }
@@ -98,8 +127,27 @@ export async function updateEmployee(payload: { employeeId: string; workerData: 
     if (!payload.employeeId) {
         return { error: 'Invalid employee ID provided.' };
     }
+
+    const { employeeId, workerData } = payload;
+
     try {
-        await adminDb.collection(EMPLOYEE_COLLECTION).doc(payload.employeeId).update(payload.workerData);
+        const dataToUpdate = { ...workerData };
+
+        // ** CRITICAL FIX **
+        // Ensure hiringDate is always stored as a Timestamp in Firestore.
+        if (typeof dataToUpdate.hiringDate === 'string') {
+            const jsDate = toJsDate(dataToUpdate.hiringDate);
+            if (jsDate) {
+                dataToUpdate.hiringDate = Timestamp.fromDate(jsDate);
+            } else {
+                // If the string is invalid, remove it to avoid writing a bad value.
+                delete dataToUpdate.hiringDate;
+            }
+        } else if (dataToUpdate.hiringDate instanceof Date) {
+            dataToUpdate.hiringDate = Timestamp.fromDate(dataToUpdate.hiringDate);
+        }
+
+        await adminDb.collection(EMPLOYEE_COLLECTION).doc(employeeId).update(dataToUpdate);
         return { success: true };
     } catch (error: any) {
         return { error: error.message };

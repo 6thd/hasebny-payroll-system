@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAllLeaveRequests, updateLeaveRequestStatus } from '@/app/actions/leave';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import type { LeaveRequest } from '@/types';
 import { format } from 'date-fns';
+import { ArrowLeft } from 'lucide-react'; // Import ArrowLeft icon
 
 const statusColors: { [key: string]: string } = {
   pending: 'bg-yellow-500',
@@ -19,9 +21,10 @@ const statusColors: { [key: string]: string } = {
 
 export default function LeaveManagementDashboard() {
   const queryClient = useQueryClient();
+  const router = useRouter(); // Initialize router
   const [filter, setFilter] = useState('pending');
 
-  const { data: leaveRequests = [], isLoading, error } = useQuery<LeaveRequest[]>({ // Corrected type annotation
+  const { data: leaveRequests = [], isLoading, error } = useQuery<LeaveRequest[]>({
     queryKey: ['leaveRequests'],
     queryFn: async () => {
         const { requests, error } = await getAllLeaveRequests();
@@ -58,9 +61,15 @@ export default function LeaveManagementDashboard() {
   const filteredRequests = leaveRequests.filter(req => filter === 'all' || req.status === filter);
 
   return (
-    <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-md">
+    <div className="w-full mx-auto p-6 bg-card text-card-foreground rounded-lg shadow-md">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Leave Requests Management</h1>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <h1 className="text-2xl font-bold">Leave Requests Management</h1>
+        </div>
         <div className="flex items-center space-x-2">
           <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
           <Button variant={filter === 'pending' ? 'default' : 'outline'} onClick={() => setFilter('pending')}>Pending</Button>

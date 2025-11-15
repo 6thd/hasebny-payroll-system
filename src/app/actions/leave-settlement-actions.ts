@@ -6,15 +6,6 @@ import { Timestamp } from "firebase-admin/firestore";
 import type { LeaveSettlementCalculation, Worker } from "@/types";
 import { calculateLeaveBalance } from "@/app/actions/leave-balance";
 
-const getJsDate = (date: any): Date | undefined => {
-    if (!date) return undefined;
-    if (date instanceof Timestamp) return date.toDate();
-    if (date.toDate && typeof date.toDate === 'function') return date.toDate();
-    const d = new Date(date);
-    if (!isNaN(d.getTime())) return d;
-    return undefined;
-};
-
 export async function calculateLeaveSettlement(workerDocumentId: string, settlementDate: string): Promise<{ settlement?: LeaveSettlementCalculation, error?: string }> {
   if (!workerDocumentId) {
     return { error: "Worker document ID is required." };
@@ -26,38 +17,29 @@ export async function calculateLeaveSettlement(workerDocumentId: string, settlem
   try {
     const workerRef = firestore.collection("employees").doc(workerDocumentId);
     const workerSnap = await workerRef.get();
-    if (!workerSnap.exists) {
+
+    if (!workerSnap.exists) { // Corrected from exists() to exists
       return { error: "Worker document not found." };
     }
     
-    const workerData = workerSnap.data() as any;
-    const sanitizedWorker: Worker = {
-        ...workerData,
-        id: workerSnap.id,
-        joiningDate: getJsDate(workerData.joiningDate),
-        leaveBalance: {
-            ...workerData.leaveBalance,
-            lastSettlementDate: getJsDate(workerData.leaveBalance?.lastSettlementDate),
-        },
-    };
-
+    const workerData = workerSnap.data() as Worker;
+    
     const balanceResult = await calculateLeaveBalance({ 
-      worker: sanitizedWorker, 
+      worker: { ...workerData, id: workerSnap.id },
       settlementDate: settlementDate 
     });
 
     if (!balanceResult.success) {
-      return { error: balanceResult.error || "Failed to calculate leave balance." };
+      return { error: balanceResult.error };
     }
 
     const { data } = balanceResult;
 
-    // Construct the object to strictly match the LeaveSettlementCalculation type.
     const settlement: LeaveSettlementCalculation = {
       workerId: workerDocumentId,
       calculationDate: new Date(settlementDate),
       totalAccruedDays: data.accruedDays,
-      daysTaken: 0, // This is a settlement calculation, so no days are considered 'taken'.
+      daysTaken: 0,
       remainingLeaveBalance: data.accruedDays,
       cashEquivalent: data.monetaryValue,
       details: data.calculationBasis,
@@ -81,7 +63,7 @@ export async function finalizeLeaveSettlement(settlement: LeaveSettlementCalcula
     if (!details || !(details as any).policy) {
         return { success: false, error: "Settlement calculation basis or policy is missing." };
     }
-    const calculationBasis = details as any; // Cast for easier access
+    const calculationBasis = details as any; 
 
     try {
         const batch = firestore.batch();

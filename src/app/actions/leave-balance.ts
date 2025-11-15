@@ -30,7 +30,7 @@ type LeavePolicy = z.infer<typeof PolicySchema>;
 
 const LeaveBalanceInputSchema = z.object({
   worker: WorkerObjectSchema, 
-  settlementDate: z.string().refine((date) => !isNaN(new Date(date).getTime()), { message: 'Invalid settlement date.' }),
+  settlementDate: z.union([z.string(), z.date()]).refine((date) => !isNaN(new Date(date).getTime()), { message: 'Invalid settlement date.' }),
   policy: PolicySchema.optional(),
 });
 
@@ -59,14 +59,19 @@ export async function calculateLeaveBalance(input: LeaveBalanceInput): Promise<{
   const policy = optionalPolicy || PolicySchema.parse({});
 
   try {
-    const joiningDate = getJsDate(worker.joiningDate);
-    if (!joiningDate) {
+    // Consistent and safe date handling for all date inputs.
+    const hiringDate = getJsDate(worker.hiringDate);
+    const periodEnd = getJsDate(settlementDate);
+    const lastSettlementDate = getJsDate(worker.leaveBalance?.lastSettlementDate);
+
+    if (!hiringDate) {
       return { success: false, error: 'تاريخ التعيين للموظف غير موجود أو غير صالح.' };
     }
+    if (!periodEnd) {
+        return { success: false, error: 'تاريخ التسوية المحدد غير صالح.' };
+    }
 
-    const periodEnd = new Date(settlementDate);
-    const lastSettlementDate = getJsDate(worker.leaveBalance?.lastSettlementDate);
-    const periodStart = lastSettlementDate && lastSettlementDate > joiningDate ? lastSettlementDate : joiningDate;
+    const periodStart = lastSettlementDate && lastSettlementDate > hiringDate ? lastSettlementDate : hiringDate;
 
     let daysToConsider = differenceInDays(periodEnd, periodStart);
     if (daysToConsider < 0) daysToConsider = 0;
@@ -91,7 +96,7 @@ export async function calculateLeaveBalance(input: LeaveBalanceInput): Promise<{
     }
     const effectiveDays = Math.max(0, daysToConsider - excludedDays);
 
-    const serviceYears = differenceInYears(periodEnd, joiningDate);
+    const serviceYears = differenceInYears(periodEnd, hiringDate);
     const annualEntitlement = serviceYears >= 5 
       ? policy.annualEntitlementAfter5Y 
       : policy.annualEntitlementBefore5Y;

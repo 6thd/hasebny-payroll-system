@@ -52,8 +52,8 @@ export default function UpcomingLeavesTab({ leaves, loading }: UpcomingLeavesTab
                                             {leaveTypeMap[leave.leaveType]?.label || leave.leaveType}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{leave.startDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
-                                    <TableCell>{leave.endDate.toDate().toLocaleDateString('ar-EG')}</TableCell>
+                                    <TableCell>{new Date(leave.startDate).toLocaleDateString('ar-EG')}</TableCell>
+                                    <TableCell>{new Date(leave.endDate).toLocaleDateString('ar-EG')}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

@@ -10,6 +10,29 @@ import {
     finalizeLeaveSettlement
 } from './leave-settlement-actions';
 
+// --- NEW HELPER FUNCTION ---
+/**
+ * Recursively converts Firestore Timestamps and Date objects to ISO strings.
+ * This makes the data safe to pass from Server Components to Client Components.
+ * @param data The data to serialize.
+ * @returns The serialized data.
+ */
+function toPlainObject(data: any): any {
+    if (data === null || data === undefined) return data;
+    if (typeof data !== 'object') return data;
+
+    if (data instanceof Timestamp) return data.toDate().toISOString();
+    if (data instanceof Date) return data.toISOString();
+    if (Array.isArray(data)) return data.map(toPlainObject);
+
+    // For generic objects, recurse
+    const plain: {[key: string]: any} = {};
+    for (const key of Object.keys(data)) {
+        plain[key] = toPlainObject(data[key]);
+    }
+    return plain;
+}
+
 // Helper to safely convert a Firestore Timestamp or a regular Date to a Date object
 function toDate(date: Date | Timestamp): Date {
     return date instanceof Timestamp ? date.toDate() : date;
@@ -70,48 +93,47 @@ export async function submitLeaveRequest(formData: SubmitLeaveRequestData): Prom
     }
 }
 
-export async function getAllLeaveRequests(): Promise<{ requests?: LeaveRequest[], error?: string }> {
+export async function getAllLeaveRequests(): Promise<{ requests?: any[], error?: string }> {
     try {
         const snapshot = await db.collection('leaveRequests').get();
-        const requests = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                startDate: toDate(data.startDate),
-                endDate: toDate(data.endDate),
-                createdAt: data.createdAt ? toDate(data.createdAt) : undefined, // Ensure type consistency
-            } as LeaveRequest;
+        let requests = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        // Sort requests by creation date (which is a Timestamp) before serializing
+        requests.sort((a: any, b: any) => {
+            const dateA = a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
+            const dateB = b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;
+            return dateB - dateA;
         });
-        // Defensively sort to handle potentially undefined dates
-        requests.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-        return { requests };
+
+        // Serialize the data to make it safe to pass to client components
+        const serializedRequests = requests.map(toPlainObject);
+        
+        return { requests: serializedRequests };
     } catch (error: any) {
         if (error.code === 5) { // Handle NOT_FOUND gracefully
             return { requests: [] }; // The collection likely doesn't exist, which is not an error.
         } 
         console.error("Error fetching leave requests:", error);
-        return { error: error.message };
+        return { error: `Error fetching leave requests: ${error.message}` };
     }
 }
 
-export async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'rejected', newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string; leaveRequest?: LeaveRequest }> {
+async function updateLeaveRequestStatus(leaveId: string, status: 'approved' | 'rejected', newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string; leaveRequest?: any }> {
     if (!leaveId || !status) { return { success: false, error: "Leave ID and Status are required." }; }
 
-    try {
-        const leaveRequestRef = db.collection('leaveRequests').doc(leaveId);
+    const leaveRequestRef = db.collection('leaveRequests').doc(leaveId);
 
+    try {
         const updateData: { status: 'approved' | 'rejected'; actionedAt: FieldValue; startDate?: Timestamp; endDate?: Timestamp } = {
             status: status,
             actionedAt: FieldValue.serverTimestamp()
         };
 
-        if (newStartDate) {
-            updateData.startDate = Timestamp.fromDate(newStartDate);
-        }
-        if (newEndDate) {
-            updateData.endDate = Timestamp.fromDate(newEndDate);
-        }
+        if (newStartDate) updateData.startDate = Timestamp.fromDate(newStartDate);
+        if (newEndDate) updateData.endDate = Timestamp.fromDate(newEndDate);
 
         await leaveRequestRef.update(updateData);
 
@@ -119,54 +141,51 @@ export async function updateLeaveRequestStatus(leaveId: string, status: 'approve
         const leaveRequest = { id: updatedDoc.id, ...updatedDoc.data() } as LeaveRequest;
 
         if (status === 'approved') {
-            const startDateRaw = updateData.startDate || leaveRequest.startDate;
-            const endDateRaw = updateData.endDate || leaveRequest.endDate;
-
-            const startDate = toDate(startDateRaw);
-            const endDate = toDate(endDateRaw);
-            
+            const startDate = toDate(newStartDate || leaveRequest.startDate);
+            const endDate = toDate(newEndDate || leaveRequest.endDate);
             const employeeId = leaveRequest.employeeId;
-            
+
             if (!employeeId) {
-                console.error(`Critical: employeeId is missing on leave request ${leaveId}. Cannot update attendance.`);
-                return { success: false, error: "Leave approved, but failed to update attendance because Employee ID is missing from the request." };
-            }
-
-            const attendanceUpdates: { [key: string]: any } = {};
-
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const year = d.getFullYear();
-                const month = d.getMonth() + 1;
-                const day = d.getDate();
-                const attendanceDocRef = db.collection(`attendance_${year}_${month}`).doc(employeeId);
-
-                if (!attendanceUpdates[attendanceDocRef.path]) {
-                    const docSnap = await attendanceDocRef.get();
-                    attendanceUpdates[attendanceDocRef.path] = docSnap.exists ? docSnap.data()?.days : {};
-                }
-
-                attendanceUpdates[attendanceDocRef.path][day] = {
-                    status: leaveRequest.leaveType === 'sick' ? 'sick_leave' : 'annual_leave'
-                };
+                throw new Error(`Critical: employeeId is missing on leave request ${leaveId}.`);
             }
 
             const batch = db.batch();
-            for (const path in attendanceUpdates) {
-                const ref = db.doc(path);
-                batch.set(ref, { days: attendanceUpdates[path] }, { merge: true });
+            const attendanceUpdatesByDoc: { [key: string]: { [key: string]: any } } = {};
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const loopDate = new Date(d);
+                const year = loopDate.getFullYear();
+                const month = loopDate.getMonth() + 1;
+                const day = loopDate.getDate();
+                const attendanceDocId = `attendance_${year}_${month}`;
+                const docPath = `${attendanceDocId}/${employeeId}`;
+
+                if (!attendanceUpdatesByDoc[docPath]) {
+                    attendanceUpdatesByDoc[docPath] = {};
+                }
+                attendanceUpdatesByDoc[docPath][`days.${day}`] = {
+                    status: leaveRequest.leaveType === 'sick' ? 'sick_leave' : 'annual_leave',
+                    notes: `Auto-updated from leave request ${leaveId}`
+                };
+            }
+
+            for (const path in attendanceUpdatesByDoc) {
+                const ref = db.collection(path.split('/')[0]).doc(path.split('/')[1]);
+                batch.update(ref, attendanceUpdatesByDoc[path]);
             }
             await batch.commit();
         }
 
         revalidatePath('/dashboard');
         revalidatePath('/leaves');
+        return { success: true, leaveRequest: toPlainObject(leaveRequest) };
 
-        return { success: true, leaveRequest };
     } catch (error: any) {
         console.error(`Error updating leave status to ${status}:`, error);
         return { success: false, error: error.message || "An unknown error occurred." };
     }
 }
+
 
 export async function approveLeaveRequest(leaveId: string, overrideBalanceCheck: boolean, newStartDate?: Date, newEndDate?: Date): Promise<{ success: boolean; error?: string }> {
      if (!leaveId) return { success: false, error: "Leave ID not provided." };

@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from 'sonner';
 import { getEmployee, updateEmployee } from '@/app/actions/employee-actions';
 import { type Worker } from '@/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface EmployeeManagementModalProps {
   isOpen: boolean;
@@ -80,13 +83,23 @@ export default function EmployeeManagementModal({ isOpen, onClose, initialWorker
     </div>
   )
 
+  const mainFormFields = [
+    'id', 'name', 'jobTitle', 'hiringDate', 'salary', 'contractType', 'idNumber', 
+    'phone', 'basicSalary', 'housing', 'transport', 'food', 'bankName', 'iban',
+    'serviceHistory', 'days', 'totalRegular', 'totalOvertime', 'absentDays', 
+    'annualLeaveDays', 'sickLeaveDays', 'leaveBalance'
+  ];
+
+  const extraFields = Object.entries(worker).filter(([key]) => !mainFormFields.includes(key));
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>إدارة بيانات الموظف</DialogTitle>
            <DialogDescription>
-            اختر موظفًا من القائمة لعرض وتعديل بياناته.
+            اختر موظفًا من القائمة لعرض وتعديل بياناته الأساسية.
           </DialogDescription>
         </DialogHeader>
         
@@ -103,66 +116,79 @@ export default function EmployeeManagementModal({ isOpen, onClose, initialWorker
             </Select>
         </div>
 
-        {isLoading || isError ? renderSkeleton() : selectedEmployeeId && (
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {/* Personal Information */}
-            <Input name="name" value={worker.name || ''} onChange={handleInputChange} placeholder="الاسم الكامل" />
-            <Input name="jobTitle" value={worker.jobTitle || ''} onChange={handleInputChange} placeholder="المسمى الوظيفي" />
-            <Input name="idNumber" value={worker.idNumber || ''} onChange={handleInputChange} placeholder="رقم الهوية/الإقامة" />
-            <Input name="phone" value={worker.phone || ''} onChange={handleInputChange} placeholder="رقم الجوال" />
-            
-            {/* Financial Information */}
-            <Input name="basicSalary" type="number" value={worker.basicSalary || ''} onChange={handleInputChange} placeholder="الراتب الأساسي" />
-            <Input name="housing" type="number" value={worker.housing || ''} onChange={handleInputChange} placeholder="بدل سكن" />
-            <Input name="transport" type="number" value={worker.transport || ''} onChange={handleInputChange} placeholder="بدل مواصلات" />
-            <Input name="food" type="number" value={worker.food || ''} onChange={handleInputChange} placeholder="بدل طعام" />
+        {isLoading ? renderSkeleton() : isError ? <p>Error loading data</p> : selectedEmployeeId && (
+          <ScrollArea className="h-[60vh] rounded-md border p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Column 1: Main Details */}
+              <div className="space-y-4">
+                <Input name="name" value={worker.name || ''} onChange={handleInputChange} placeholder="الاسم الكامل" aria-label="الاسم الكامل" />
+                <Input name="jobTitle" value={worker.jobTitle || ''} onChange={handleInputChange} placeholder="المسمى الوظيفي" aria-label="المسمى الوظيفي" />
+                <Input name="idNumber" value={worker.idNumber || ''} onChange={handleInputChange} placeholder="رقم الهوية/الإقامة" aria-label="رقم الهوية/الإقامة" />
+                <Input name="phone" value={worker.phone || ''} onChange={handleInputChange} placeholder="رقم الجوال" aria-label="رقم الجوال" />
+                 <Select name="contractType" onValueChange={(value: string) => handleSelectChange('contractType', value)} value={worker.contractType}>
+                    <SelectTrigger aria-label="نوع العقد">
+                        <SelectValue placeholder="نوع العقد" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="fixed">عقد محدد المدة</SelectItem>
+                        <SelectItem value="unlimited">عقد غير محدد المدة</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Input 
+                  name="hiringDate" 
+                  type="date" 
+                  value={worker.hiringDate ? (worker.hiringDate instanceof Date ? worker.hiringDate.toISOString().split('T')[0] : String(worker.hiringDate).split('T')[0]) : ''} 
+                  onChange={handleInputChange} 
+                  placeholder="تاريخ التعيين" 
+                  aria-label="تاريخ التعيين"
+                />
+              </div>
 
-            {/* Contract Information */}
-            <Select name="contractType" onValueChange={(value: string) => handleSelectChange('contractType', value)} value={worker.contractType}>
-                <SelectTrigger>
-                    <SelectValue placeholder="نوع العقد" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="fixed">عقد محدد المدة</SelectItem>
-                    <SelectItem value="unlimited">عقد غير محدد المدة</SelectItem>
-                </SelectContent>
-            </Select>
-
-            <Input 
-              name="joiningDate" 
-              type="date" 
-              value={worker.joiningDate ? (worker.joiningDate instanceof Date ? worker.joiningDate.toISOString().split('T')[0] : String(worker.joiningDate).split('T')[0]) : ''} 
-              onChange={handleInputChange} 
-              placeholder="تاريخ الالتحاق" 
-            />
-
-             {/* Bank Information */}
-            <Input name="bankName" value={worker.bankName || ''} onChange={handleInputChange} placeholder="اسم البنك" />
-            <Input name="iban" value={worker.iban || ''} onChange={handleInputChange} placeholder="رقم الآيبان" />
-
-
-            {/* Custom Fields Expansion */}
-            <div className="col-span-2 mt-4">
-                <h4 className="font-semibold mb-2">حقول إضافية</h4>
-                {Object.keys(worker).filter(key => ![ 'id', 'name', 'jobTitle', 'joiningDate', 'salary', 'contractType', 'idNumber', 'phone', 'basicSalary', 'housing', 'transport', 'food', 'bankName', 'iban', 'serviceHistory', 'days', 'totalRegular', 'totalOvertime', 'absentDays', 'annualLeaveDays', 'sickLeaveDays'].includes(key)).map(key => (
-                    <div key={key} className="flex items-center gap-2 mb-2">
-                        <Input 
-                            value={key}
-                            disabled
-                            className="w-1/3"
-                        />
-                        <Input 
-                            name={key} 
-                            value={String((worker as any)[key])} 
-                            onChange={handleInputChange} 
-                            placeholder="القيمة"
-                            className="w-2/3"
-                        />
-                    </div>
-                ))}
+              {/* Column 2: Financial & Bank Details */}
+              <div className="space-y-4">
+                <Input name="basicSalary" type="number" value={worker.basicSalary || ''} onChange={handleInputChange} placeholder="الراتب الأساسي" aria-label="الراتب الأساسي" />
+                <Input name="housing" type="number" value={worker.housing || ''} onChange={handleInputChange} placeholder="بدل سكن" aria-label="بدل سكن" />
+                <Input name="transport" type="number" value={worker.transport || ''} onChange={handleInputChange} placeholder="بدل مواصلات" aria-label="بدل مواصلات" />
+                <Input name="food" type="number" value={worker.food || ''} onChange={handleInputChange} placeholder="بدل طعام" aria-label="بدل طعام" />
+                <Input name="bankName" value={worker.bankName || ''} onChange={handleInputChange} placeholder="اسم البنك" aria-label="اسم البنك" />
+                <Input name="iban" value={worker.iban || ''} onChange={handleInputChange} placeholder="رقم الآيبان" aria-label="رقم الآيبان" />
+              </div>
             </div>
 
-          </div>
+            {/* Section for Extra Fields, only if they exist */}
+            {extraFields.length > 0 && (
+                <div className="col-span-1 md:col-span-2 mt-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>بيانات إضافية</CardTitle>
+                            <CardDescription>
+                                حقول إضافية موجودة في سجل الموظف. هذه الحقول للقراءة فقط.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-48 w-full">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[200px]">الحقل</TableHead>
+                                            <TableHead>القيمة</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {extraFields.map(([key, value]) => (
+                                            <TableRow key={key}>
+                                                <TableCell className="font-mono text-sm">{key}</TableCell>
+                                                <TableCell className="font-mono text-sm">{String(value)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+          </ScrollArea>
         )}
 
         <DialogFooter>

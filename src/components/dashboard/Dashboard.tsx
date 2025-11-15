@@ -40,10 +40,8 @@ export default function Dashboard() {
         }
       }
 
-      // Store a clean, raw version of the workers for modals.
       setRawWorkers(workersToLoad);
 
-      // Fetch all necessary data in parallel
       const [attendanceSnapshot, monthlyDocsSnap, approvedLeavesSnapshot] = await Promise.all([
         getDocs(collection(db, `attendance_${date.year}_${date.month + 1}`)),
         getDocs(collection(db, `salaries_${date.year}_${date.month + 1}`)),
@@ -63,16 +61,24 @@ export default function Dashboard() {
           monthlyDataMap[doc.id] = doc.data() as MonthlyData;
       });
       
-      // Process the workers list for display purposes. The ID is now correctly preserved.
       const processedWorkers = workersToLoad.map(w => {
-        const workerWithFullData = { 
-          ...w, 
-          days: attendanceData[w.id] || {},
+        // First, create a temporary object with monthly salary adjustments
+        const workerWithMonthly = {
+          ...w,
           commission: monthlyDataMap[w.id]?.commission || 0,
           advances: monthlyDataMap[w.id]?.advances || 0,
           penalties: monthlyDataMap[w.id]?.penalties || 0,
         };
-        return processWorkerData(workerWithFullData, date.year, date.month);
+        
+        // Process the data to get payroll calculations (absent days, totals, etc.)
+        const processed = processWorkerData(workerWithMonthly, date.year, date.month);
+
+        // NOW, add the detailed daily attendance data to the final processed object.
+        // This ensures the 'days' data is not stripped out by the processing function.
+        return {
+            ...processed,
+            days: attendanceData[w.id] || {},
+        };
       });
       
       setWorkers(processedWorkers);
@@ -113,7 +119,6 @@ export default function Dashboard() {
           date={date}
           onDateChange={handleDateChange}
           isAdmin={isAdmin}
-          // Pass the clean, raw workers list to the header and its modals.
           workers={rawWorkers}
           onDataUpdate={handleDataUpdate}
           activeView={activeView}
@@ -122,7 +127,6 @@ export default function Dashboard() {
 
         {isAdmin ? (
           <AdminDashboard
-            // Pass the processed workers for display in the dashboard views.
             workers={workers}
             date={date}
             isAdmin={isAdmin}

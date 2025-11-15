@@ -1,17 +1,6 @@
 import "server-only";
 import admin from "firebase-admin";
 
-// Debugging Step: Log environment variables to verify they are loaded on the server.
-console.log("--- Verifying Firebase Admin Environment Variables ---");
-console.log({
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKeyLoaded: !!process.env.FIREBASE_PRIVATE_KEY,
-  privateKeyType: typeof process.env.FIREBASE_PRIVATE_KEY,
-});
-console.log("----------------------------------------------------");
-
-
 const requiredEnvVars = [
   'FIREBASE_PROJECT_ID',
   'FIREBASE_CLIENT_EMAIL',

@@ -51,41 +51,51 @@ export function calculatePayroll(worker: Worker | null, year: number, month: num
   };
 }
 
-
 export function processWorkerData(worker: Worker, year: number, month: number): Worker {
-  // Return the worker as is if no days data is present.
-  if (!worker || typeof worker.days === 'undefined') {
-    return { ...worker, id: worker.id, totalRegular: 0, totalOvertime: 0, absentDays: 0, annualLeaveDays: 0, sickLeaveDays: 0 };
-  }
+  // Create a new worker object, preserving all original data.
+  const processedWorker = { ...worker };
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Initialize calculated fields
   let totalRegular = 0, totalOvertime = 0, absentDays = 0, annualLeaveDays = 0, sickLeaveDays = 0;
 
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dayData = worker.days[day];
-    if (dayData) {
-      switch (dayData.status) {
-        case 'present':
-          totalRegular += dayData.regularHours || 0;
-          totalOvertime += dayData.overtimeHours || 0;
-          break;
-        case 'absent':
-          absentDays++;
-          break;
-        case 'annual_leave':
-          annualLeaveDays++;
-          break;
-        case 'sick_leave':
-          sickLeaveDays++;
-          break;
-        default:
-          break;
+  // Ensure worker.days is an object before processing.
+  if (processedWorker.days && typeof processedWorker.days === 'object') {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayData = processedWorker.days[day];
+      if (dayData) {
+        switch (dayData.status) {
+          case 'present':
+            totalRegular += dayData.regularHours || 0;
+            totalOvertime += dayData.overtimeHours || 0;
+            break;
+          case 'absent':
+            absentDays++;
+            break;
+          case 'annual_leave':
+            annualLeaveDays++;
+            break;
+          case 'sick_leave':
+            sickLeaveDays++;
+            break;
+          default:
+            break;
+        }
       }
     }
   }
-  // Explicitly return the id to ensure it's not lost.
-  return { ...worker, id: worker.id, totalRegular, totalOvertime, absentDays, annualLeaveDays, sickLeaveDays };
+  
+  // Assign calculated totals to the new worker object and return it.
+  // This ensures no data (like the 'days' object) is lost.
+  processedWorker.totalRegular = totalRegular;
+  processedWorker.totalOvertime = totalOvertime;
+  processedWorker.absentDays = absentDays;
+  processedWorker.annualLeaveDays = annualLeaveDays;
+  processedWorker.sickLeaveDays = sickLeaveDays;
+  
+  return processedWorker;
 }
+
 
 export function getFridaysInMonth(year: number, month: number): number[] {
     const fridays = [];
